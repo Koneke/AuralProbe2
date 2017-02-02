@@ -19,15 +19,11 @@ namespace Aural_Probe
 		/// </summary>
 		private System.ComponentModel.Container components = null;
 
-		#region Public Delegates
-
 		// delegates used to call MainForm functions from worker thread
 		public delegate void DelegateUpdate();
-        public delegate void DelegateUpdateLabel(string text);
-        public delegate void DelegateUpdateMaximumAndStep(int nMaximum, int nStep);
-        public delegate void DelegateThreadFinished();
-
-		#endregion
+		public delegate void DelegateUpdateLabel(string text);
+		public delegate void DelegateUpdateMaximumAndStep(int nMaximum, int nStep);
+		public delegate void DelegateThreadFinished();
 
 		// worker thread
 		Thread m_WorkerThread;
@@ -42,34 +38,34 @@ namespace Aural_Probe
 
 		// Delegate instances used to cal user interface functions 
 		// from worker thread:
-        public DelegateUpdate m_DelegateUpdateForm;
-        public DelegateUpdateLabel m_DelegateUpdateLabel;
-        public DelegateUpdateMaximumAndStep m_DelegateUpdateMaximumAndStep;
+		public DelegateUpdate m_DelegateUpdateForm;
+		public DelegateUpdateLabel m_DelegateUpdateLabel;
+		public DelegateUpdateMaximumAndStep m_DelegateUpdateMaximumAndStep;
 		public System.Windows.Forms.Label labelStatus;
 		public DelegateThreadFinished m_DelegateThreadFinished;
 
-        public void InitForm()
-        {
-            labelStatus.Text = "Please wait...";
-            progressBar1.Minimum = 0;
-            progressBar1.Step = 1;
-            progressBar1.Value = 0;
-        }
+		public void InitForm()
+		{
+			labelStatus.Text = "Please wait...";
+			progressBar1.Minimum = 0;
+			progressBar1.Step = 1;
+			progressBar1.Value = 0;
+		}
 
-        public void UpdateMaximumAndStep(int nMaximum, int nStep)
-        {
-            if (nMaximum >= 0)
-                progressBar1.Maximum = nMaximum;
-            if (nStep >= 0)
-                progressBar1.Step = nStep;
-        }
+		public void UpdateMaximumAndStep(int nMaximum, int nStep)
+		{
+			if (nMaximum >= 0)
+				progressBar1.Maximum = nMaximum;
+			if (nStep >= 0)
+				progressBar1.Step = nStep;
+		}
 
-        public void UpdateLabel(string text)
-        {
-            labelStatus.Text = text;
-        }
+		public void UpdateLabel(string text)
+		{
+			labelStatus.Text = text;
+		}
 
-        public void UpdateForm()
+		public void UpdateForm()
 		{
 			try
 			{
@@ -164,8 +160,8 @@ namespace Aural_Probe
 			m_mainForm = mainForm;
 
 			// initialize delegates
-            m_DelegateUpdateMaximumAndStep = new DelegateUpdateMaximumAndStep(this.UpdateMaximumAndStep);
-            m_DelegateUpdateLabel = new DelegateUpdateLabel(this.UpdateLabel);
+			m_DelegateUpdateMaximumAndStep = new DelegateUpdateMaximumAndStep(this.UpdateMaximumAndStep);
+			m_DelegateUpdateLabel = new DelegateUpdateLabel(this.UpdateLabel);
 			m_DelegateUpdateForm = new DelegateUpdate(this.UpdateForm);
 			m_DelegateThreadFinished = new DelegateThreadFinished(this.ThreadFinished);
 
@@ -182,9 +178,9 @@ namespace Aural_Probe
 		/// </summary>
 		protected override void Dispose( bool disposing )
 		{
-            m_EventStopThread.Close();
-            m_EventThreadStopped.Close();
-            if (disposing)
+			m_EventStopThread.Close();
+			m_EventThreadStopped.Close();
+			if (disposing)
 			{
 				if(components != null)
 				{
@@ -272,7 +268,7 @@ namespace Aural_Probe
 				m_bUseCache = bUseCache;
 				button1.Enabled = true;
 
-                InitForm();
+				InitForm();
 
 				// create worker thread instance
 				m_WorkerThread = new Thread(new ThreadStart(this.WorkerThreadFunction));

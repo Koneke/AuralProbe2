@@ -159,7 +159,7 @@ namespace Aural_Probe
 				}
 
 				// check if thread is cancelled
-				if ( m_EventStop.WaitOne(0, true) )
+				if (m_EventStop.WaitOne(0, true))
 				{
 					bCancelled = true;
 					// clean up
@@ -237,7 +237,7 @@ namespace Aural_Probe
 						if (nCacheVersion == 1)
 						{
 							int nSamples = (int)deserializer.Deserialize(myFileStream);
-							MainForm.app.AllocateSampleData(nSamples);
+							MainForm.app.Library.AllocateSampleData(nSamples);
 							if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
 								m_progressBar.Invoke(m_progressBar.m_DelegateUpdateMaximumAndStep, nSamples, nSamples / 20);
 							for (int i = 0; i < nSamples; ++i)
@@ -339,14 +339,23 @@ namespace Aural_Probe
 					if (!bResult)
 					{
 						if (!bCancelled)
-							MessageBox.Show("Could not load all samples.", "Not all samples loaded!",
-								MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+						{
+							MessageBox.Show(
+								"Could not load all samples.",
+								"Not all samples loaded!",
+								MessageBoxButtons.OK,
+								MessageBoxIcon.Exclamation);
+						}
 
 						if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
+						{
 							m_progressBar.Invoke(m_progressBar.m_DelegateThreadFinished, null);
+						}
 
 						if (bCancelled)
+						{
 							m_mainForm.ClearSamples();
+						}
 
 						return;
 					}
@@ -361,10 +370,17 @@ namespace Aural_Probe
 						nDirectoryCount += CountDirectoriesInDirectory(dir);
 						nFileCount += CountFilesInDirectory(dir);
 					}
+
 					if (!bCancelled)
-						MainForm.app.AllocateSampleData(nFileCount);
+					{
+						MainForm.app.Library.AllocateSampleData(nFileCount);
+					}
+
 					if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
+					{
 						m_progressBar.Invoke(m_progressBar.m_DelegateUpdateMaximumAndStep, nDirectoryCount, -1);
+					}
+
 					for (int i = 0; i < MainForm.configFile.lnNumSearchDirectoriesScrubbed; ++i)
 					{
 						string dir = MainForm.configFile.searchDirectoriesScrubbed[i];
@@ -389,7 +405,9 @@ namespace Aural_Probe
 					}
 				}
 				if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
+				{
 					m_progressBar.Invoke(m_progressBar.m_DelegateThreadFinished, null);
+				}
 			}
 			catch (System.Exception e)
 			{

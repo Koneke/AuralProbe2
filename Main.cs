@@ -29,7 +29,7 @@ namespace Aural_Probe
 		public static string kSampleCacheFilename = "cache.dat";
 		public const int kVersionedSampleCacheID = 1;
 
-		public static ConfigFile configFile => app.configFile;
+		public static ConfigFile configFile => app.Files.configFile;
 		
 		public static int knMaxColors = 16;
 		public int nColorInc;
@@ -68,7 +68,7 @@ namespace Aural_Probe
 		public int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
 
 		public static App app;
-		public static string workingDirectory => app.workingDirectory;
+		public static string workingDirectory => app.Files.workingDirectory;
 
 		public bool lbFavoritesOnly;
 		public bool lbDirtyFavorites;
@@ -267,9 +267,9 @@ namespace Aural_Probe
 			try
 			{
 				string title = "Aural Probe";
-				string[] splitFilename = app.favoritesFile.currentFavoritesFilename.Split('\\');
+				string[] splitFilename = app.Files.favoritesFile.currentFavoritesFilename.Split('\\');
 
-				if (app.favoritesFile.bLoaded)
+				if (app.Files.favoritesFile.bLoaded)
 				{
 					title += " - " + splitFilename[splitFilename.Length-1];
 				}
@@ -1050,11 +1050,11 @@ namespace Aural_Probe
 				forceLoadFavoritesName = filename;
 				if (forceLoadFavoritesName.Length > 0)
 				{
-					app.favoritesFile.Load(forceLoadFavoritesName);
-					if (!UpdateFavoriteDataFromFavoritesFile(ref app.favoritesFile, true))
+					app.Files.favoritesFile.Load(forceLoadFavoritesName);
+					if (!UpdateFavoriteDataFromFavoritesFile(ref app.Files.favoritesFile, true))
 					{
 						forceLoadFavoritesName = "";
-						app.favoritesFile.Reset(0);
+						app.Files.favoritesFile.Reset(0);
 					}
 					UpdateSampleFavorites();
 					UpdateAudioSamples();
@@ -1077,14 +1077,14 @@ namespace Aural_Probe
 					fdlg.InitialDirectory = configFile.defaultFavoritesDirectory;
 				fdlg.OverwritePrompt = true;
 				fdlg.Filter = "Aural Probe Favorites (*.apf)|*.apf|All files (*.*)|*.*";
-				fdlg.FileName = app.favoritesFile.currentFavoritesFilename;
+				fdlg.FileName = app.Files.favoritesFile.currentFavoritesFilename;
 				
 				DialogResult result = fdlg.ShowDialog();
 				if (fdlg.FileName.Length > 0)
 				{
-					UpdateFavoritesFileFromFavoriteData(ref app.favoritesFile, true);
-					app.favoritesFile.currentFavoritesFilename = fdlg.FileName;
-					app.favoritesFile.Save();
+					UpdateFavoritesFileFromFavoriteData(ref app.Files.favoritesFile, true);
+					app.Files.favoritesFile.currentFavoritesFilename = fdlg.FileName;
+					app.Files.favoritesFile.Save();
 					lbDirtyFavorites = false;
 					UpdateFormWithConfigurationData();
 					UpdateAudioSamples();
@@ -1147,8 +1147,8 @@ namespace Aural_Probe
 					if (sampleFavoritesCount[0] > 0 && 
 						DialogResult.Yes == MessageBox.Show("Are you sure you want to reset the favorites?", "Reset favorites?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
 					{
-						app.favoritesFile.Reset(0);
-						UpdateFavoriteDataFromFavoritesFile(ref app.favoritesFile, true);
+						app.Files.favoritesFile.Reset(0);
+						UpdateFavoriteDataFromFavoritesFile(ref app.Files.favoritesFile, true);
 						lbDirtyFavorites = false;
 						UpdateSampleFavorites();
 						UpdateAudioSamples();
@@ -1172,9 +1172,9 @@ namespace Aural_Probe
 						fdlg.RestoreDirectory = true; 
 						if(fdlg.ShowDialog() == DialogResult.OK && fdlg.FileName.Length > 0) 
 						{
-							app.favoritesFile.Load(fdlg.FileName);
+							app.Files.favoritesFile.Load(fdlg.FileName);
 							lbDirtyFavorites = false;
-							UpdateFavoriteDataFromFavoritesFile(ref app.favoritesFile, true);
+							UpdateFavoriteDataFromFavoritesFile(ref app.Files.favoritesFile, true);
 							UpdateSampleFavorites();
 							UpdateAudioSamples();
 						}

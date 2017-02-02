@@ -26,19 +26,19 @@ namespace Aural_Probe
 		// 3 = Added file types + autoplay
 		// 4 = Added default sound device
 		// 5 = Added always on top
-        // 6 = Added use regular expression option (per category)
+		// 6 = Added use regular expression option (per category)
 		// ...
 		public int kCurrentConfigFileVersion = 6;
 
 		public string[] categoryName;
 		public string[,] categorySearchStrings;
-        public bool[] categoryUseRegularExpressions;
+		public bool[] categoryUseRegularExpressions;
 		public string[] searchDirectories;
-        public string[] searchDirectoriesScrubbed;
-        public int lnNumCategories;
+		public string[] searchDirectoriesScrubbed;
+		public int lnNumCategories;
 		public int[] lnNumCategorySearchStrings;
 		public int lnNumSearchDirectories;
-        public int lnNumSearchDirectoriesScrubbed;
+		public int lnNumSearchDirectoriesScrubbed;
 		public int lnSampleDisplaySizeW;
 		public int lnSampleDisplaySizeH;
 		public bool lbRescanPrompt;
@@ -59,8 +59,8 @@ namespace Aural_Probe
 		{
 			categoryName = new string[kMaxCategories];
 			categorySearchStrings = new string[kMaxCategories,kMaxSearchStringsPerCategory];
-            categoryUseRegularExpressions = new bool[kMaxCategories];
-            searchDirectories = new string[kMaxDirectories];
+			categoryUseRegularExpressions = new bool[kMaxCategories];
+			searchDirectories = new string[kMaxDirectories];
 			lnNumCategorySearchStrings = new int[kMaxCategories];
 			lbRescanPrompt = true;
 			lbIncludeFilePaths = true;
@@ -84,7 +84,7 @@ namespace Aural_Probe
 				using(Stream myFileStream = File.OpenRead(filename))
 				{
 					BinaryFormatter deserializer = new BinaryFormatter();
-                    
+					
 					int nVersion = (int)deserializer.Deserialize(myFileStream);
 					if (nVersion == kVersionedConfigFileID)
 					{
@@ -107,9 +107,9 @@ namespace Aural_Probe
 						{
 							categorySearchStrings[lnCategory,lnSS] = (string)deserializer.Deserialize(myFileStream);
 						}
-                        if (nVersion >= 6)
-                            categoryUseRegularExpressions[lnCategory] = (bool)deserializer.Deserialize(myFileStream);
-                    }
+						if (nVersion >= 6)
+							categoryUseRegularExpressions[lnCategory] = (bool)deserializer.Deserialize(myFileStream);
+					}
 					lnNumSearchDirectories = (int)deserializer.Deserialize(myFileStream);
 					for(int lnSearchDirectory = 0; lnSearchDirectory < lnNumSearchDirectories; lnSearchDirectory++ )
 					{
@@ -173,97 +173,99 @@ namespace Aural_Probe
 			}
 		}
 
-        public void UpdateScrubbedSearchDirectories()
-        {
-            System.Collections.ArrayList newList = new System.Collections.ArrayList();
+		public void UpdateScrubbedSearchDirectories()
+		{
+			System.Collections.ArrayList newList = new System.Collections.ArrayList();
 
-            lnNumSearchDirectoriesScrubbed = 0;
+			lnNumSearchDirectoriesScrubbed = 0;
 
-            for (int i = 0; i < lnNumSearchDirectories; ++i)
-            {
-                string str = searchDirectories[i].ToLower();
-                if (str == null)
-                    continue;
+			for (int i = 0; i < lnNumSearchDirectories; ++i)
+			{
+				string str = searchDirectories[i].ToLower();
+				if (str == null)
+				{
+					continue;
+				}
 
-                if (Directory.Exists(str))
-                {
-                    if (!newList.Contains(str))    // skip duplicates
-                    {
-                        bool bAlreadyContainedByOtherDirectory = false;
-                        for (int j = 0; j < lnNumSearchDirectories; ++j)
-                        {
-                            if (i == j)
-                                continue;
+				if (Directory.Exists(str))
+				{
+					if (!newList.Contains(str))    // skip duplicates
+					{
+						bool bAlreadyContainedByOtherDirectory = false;
+						for (int j = 0; j < lnNumSearchDirectories; ++j)
+						{
+							if (i == j)
+								continue;
 
-                            string newStr = searchDirectories[j].ToLower();
-                            if (newStr == null || str == newStr)
-                                continue;
+							string newStr = searchDirectories[j].ToLower();
+							if (newStr == null || str == newStr)
+								continue;
 
-                            if (str.IndexOf(newStr) != -1)
-                            {
-                                bAlreadyContainedByOtherDirectory = true;
-                                break;
-                            }
-                        }
-                        if (!bAlreadyContainedByOtherDirectory)
-                        {
-                            newList.Add(searchDirectories[i]);
-                            lnNumSearchDirectoriesScrubbed++;
-                        }
-                    }
-                }
-            }
+							if (str.IndexOf(newStr) != -1)
+							{
+								bAlreadyContainedByOtherDirectory = true;
+								break;
+							}
+						}
+						if (!bAlreadyContainedByOtherDirectory)
+						{
+							newList.Add(searchDirectories[i]);
+							lnNumSearchDirectoriesScrubbed++;
+						}
+					}
+				}
+			}
 
-            searchDirectoriesScrubbed = (string[])newList.ToArray(typeof(string));
-        }
+			searchDirectoriesScrubbed = (string[])newList.ToArray(typeof(string));
+		}
 
-        public string GetConfigFilePath()
-        {
-            return MainForm.GetApplicationDataPath() + "\\" + kConfigFile;
-        }
+		public string GetConfigFilePath()
+		{
+			return MainForm.GetApplicationDataPath() + "\\" + kConfigFile;
+		}
 
-        public void Load()
+		public void Load()
 		{
 			Directory.SetCurrentDirectory(MainForm.workingDirectory);
-            bool bConfigExists = File.Exists(GetConfigFilePath());
+			bool bConfigExists = File.Exists(GetConfigFilePath());
 			bool bOldConfigExists = File.Exists( kConfigFile );
 			bool bDefaultExists = File.Exists( kDefaultFile );
 			if (bConfigExists)
 			{
-                ReadDataFromFile(GetConfigFilePath());
+				ReadDataFromFile(GetConfigFilePath());
 			}
-            else if (bOldConfigExists)
-            {
-                ReadDataFromFile(kConfigFile);
-            }
-            else if (bDefaultExists)
-            {
-                ReadDataFromFile(kDefaultFile);
-                lnSampleDisplaySizeW = 192;
-                lnSampleDisplaySizeH = 32;
-            }
-            else
-            {
-                // Set up defaults
-                lnNumCategories = 1;
-                categoryName[0] = "All Samples";
-                lnNumSearchDirectories = 0;
-                lnSampleDisplaySizeW = 192;
-                lnSampleDisplaySizeH = 32;
-            }
+			else if (bOldConfigExists)
+			{
+				ReadDataFromFile(kConfigFile);
+			}
+			else if (bDefaultExists)
+			{
+				ReadDataFromFile(kDefaultFile);
+				lnSampleDisplaySizeW = 192;
+				lnSampleDisplaySizeH = 32;
+			}
+			else
+			{
+				// Set up defaults
+				lnNumCategories = 1;
+				categoryName[0] = "All Samples";
+				lnNumSearchDirectories = 0;
+				lnSampleDisplaySizeW = 192;
+				lnSampleDisplaySizeH = 32;
+			}
 
-            UpdateScrubbedSearchDirectories();
+			UpdateScrubbedSearchDirectories();
 		}
 
 		public void Save()
 		{
 			try
-            {
-                System.IO.Directory.CreateDirectory(MainForm.GetApplicationDataPath());
-                using (Stream myFileStream = File.OpenWrite(GetConfigFilePath()))
+			{
+				System.IO.Directory.CreateDirectory(MainForm.GetApplicationDataPath());
+				using (Stream myFileStream = File.OpenWrite(GetConfigFilePath()))
 				{
 					BinaryFormatter serializer = new BinaryFormatter();
-                    serializer.Serialize(myFileStream, kVersionedConfigFileID);
+					serializer.Serialize(myFileStream, kVersionedConfigFileID);
 					serializer.Serialize(myFileStream, kCurrentConfigFileVersion);
 					serializer.Serialize(myFileStream, lnNumCategories);
 					for(int lnCategory = 0; lnCategory < lnNumCategories; lnCategory++ )
@@ -274,8 +276,8 @@ namespace Aural_Probe
 						{
 							serializer.Serialize(myFileStream, categorySearchStrings[lnCategory,lnSS].ToString());
 						}
-                        serializer.Serialize(myFileStream, categoryUseRegularExpressions[lnCategory]);
-                    }
+						serializer.Serialize(myFileStream, categoryUseRegularExpressions[lnCategory]);
+					}
 					serializer.Serialize(myFileStream, lnNumSearchDirectories);
 					for(int lnSearchDirectory = 0; lnSearchDirectory < lnNumSearchDirectories; lnSearchDirectory++ )
 					{
@@ -300,19 +302,19 @@ namespace Aural_Probe
 					serializer.Serialize(myFileStream, lbAlwaysOnTop);
 				}
 
-                UpdateScrubbedSearchDirectories();
+				UpdateScrubbedSearchDirectories();
 			}
 			catch (Exception ex)
 			{
-                MessageBox.Show("Error! Could not save config file! " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                try
-                {
-                    File.Delete(GetConfigFilePath());
-                }
-                catch (Exception ex2)
-                {
-                    MessageBox.Show("Error! Could not delete config file! " + ex2.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                }
+				MessageBox.Show("Error! Could not save config file! " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				try
+				{
+					File.Delete(GetConfigFilePath());
+				}
+				catch (Exception ex2)
+				{
+					MessageBox.Show("Error! Could not delete config file! " + ex2.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				}
 			}
 		}
 	}

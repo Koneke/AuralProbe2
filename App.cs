@@ -13,10 +13,6 @@ namespace Aural_Probe
 
 		private MainForm mainForm;
 
-		public string workingDirectory;
-		public ConfigFile configFile;
-		public FavoritesFile favoritesFile;
-
 		public bool lbFavoritesOnly;
 		public bool lbDirtyFavorites;
 		public bool bUseCachedSamplesIfPossible;
@@ -25,6 +21,7 @@ namespace Aural_Probe
 		private int bitMissing = 1;
 
 		public Library Library;
+		public Files Files;
 
 		public int listSamplesSingleSelectedIndex; // when there are multiple selections, this is -1, otherwise it's listSamples.SelectedIndex
 		public int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
@@ -35,34 +32,19 @@ namespace Aural_Probe
 
 		public App(MainForm mainForm)
 		{
-			this.Library = new Library();
-		}
-
-		public void AllocateSampleData(int nSize)
-		{
-			try
-			{
-				Library.sampleList = new string[nSize];
-				Library.sampleColorIndex = new int[nSize];
-				Library.sampleBitField = new int[nSize];
-				Library.sampleIndices = new int[configFile.kMaxCategories,nSize];
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("AllocateSampleData " + nSize + " " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
-			}
+			this.Library = new Library(this);
+			this.Files = new Files();
 		}
 
 		private void Init()
 		{
-			workingDirectory = Directory.GetCurrentDirectory();
+			Files.workingDirectory = Directory.GetCurrentDirectory();
+			Files.configFile = new ConfigFile();
+			Files.configFile.Load();
 
 			lbDirtyFavorites = false;
 
-			configFile = new ConfigFile();
-			configFile.Load();
-
-			favoritesFile = new FavoritesFile();
+			Files.favoritesFile = new FavoritesFile();
 			mainForm.configurationForm = new ConfigurationForm();
 			mainForm.aboutForm = new AboutForm();
 			mainForm.progressForm = new ProgressBar(mainForm);
@@ -86,8 +68,8 @@ namespace Aural_Probe
 				colorList[i, 1] = Color.FromArgb((int)(R * 255.0f), (int)(G * 255.0f), (int)(B * 255.0f));
 			}
 
-			Library.sampleIndicesCount = new int[configFile.kMaxCategories];
-			Library.sampleFavoritesCount = new int[configFile.kMaxCategories];
+			Library.sampleIndicesCount = new int[Files.configFile.kMaxCategories];
+			Library.sampleFavoritesCount = new int[Files.configFile.kMaxCategories];
 
 			lbFavoritesOnly = false;
 
@@ -154,7 +136,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				return configFile.categoryName[i] + " (" + (lbFavoritesOnly ? Library.sampleFavoritesCount[i] : Library.sampleIndicesCount[i]).ToString() + ")";
+				return Files.configFile.categoryName[i] + " (" + (lbFavoritesOnly ? Library.sampleFavoritesCount[i] : Library.sampleIndicesCount[i]).ToString() + ")";
 			}
 			catch (System.Exception e)
 			{
