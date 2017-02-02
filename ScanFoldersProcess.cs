@@ -173,15 +173,15 @@ namespace Aural_Probe
 				m_mainForm.sampleList[m_mainForm.lnSamples] = s;
 				m_mainForm.sampleColorIndex[m_mainForm.lnSamples] = nColorIndex;
 				
-				if (!MainForm.configFile.lbIncludeFilePaths)
+				if (!MainForm.configFile.IncludeFilePaths)
 				{
 					string[] sSplit = s.Split('\\');
 					s = sSplit[sSplit.Length - 1];
 				}
 
-				for (int i = 0; i < MainForm.configFile.lnNumCategories; ++i)
+				for (int i = 0; i < MainForm.configFile.Categories.Count; ++i)
 				{
-					if (MainForm.configFile.lnNumCategorySearchStrings[i] == 0)
+					if (MainForm.configFile.Categories[i].SearchStrings.Count == 0)
 					{
 						// Special case for "Everything" category
 						m_mainForm.sampleIndices[i,m_mainForm.sampleIndicesCount[i]] = m_mainForm.lnSamples;
@@ -189,9 +189,9 @@ namespace Aural_Probe
 					}
 					else
 					{
-						if (MainForm.configFile.categoryUseRegularExpressions[i])
+						if (MainForm.configFile.Categories[i].UseRegex)
 						{
-							Regex regex = new Regex(MainForm.configFile.categorySearchStrings[i, 0], RegexOptions.IgnoreCase);
+							Regex regex = new Regex(MainForm.configFile.Categories[i].SearchStrings[0], RegexOptions.IgnoreCase);
 							Match match = regex.Match(s);
 							if (match.Success)
 							{
@@ -201,9 +201,9 @@ namespace Aural_Probe
 						}
 						else
 						{
-							for (int j = 0; j < MainForm.configFile.lnNumCategorySearchStrings[i]; ++j)
+							for (int j = 0; j < MainForm.configFile.Categories[i].SearchStrings.Count; ++j)
 							{
-								if (s.IndexOf(MainForm.configFile.categorySearchStrings[i, j], StringComparison.OrdinalIgnoreCase) != -1)
+								if (s.IndexOf(MainForm.configFile.Categories[i].SearchStrings[j], StringComparison.OrdinalIgnoreCase) != -1)
 								{
 									m_mainForm.sampleIndices[i, m_mainForm.sampleIndicesCount[i]] = m_mainForm.lnSamples;
 									m_mainForm.sampleIndicesCount[i]++;
@@ -325,12 +325,12 @@ namespace Aural_Probe
 			{
 				bCancelled = false;
 
-				formatFlag[0] = MainForm.configFile.lbWAV;
-				formatFlag[1] = MainForm.configFile.lbMP3;
-				formatFlag[2] = MainForm.configFile.lbWMA;
-				formatFlag[3] = MainForm.configFile.lbOGG;
-				formatFlag[4] = MainForm.configFile.lbAIFF;
-				formatFlag[5] = MainForm.configFile.lbFLAC;
+				formatFlag[0] = MainForm.configFile.LoadWav;
+				formatFlag[1] = MainForm.configFile.LoadMp3;
+				formatFlag[2] = MainForm.configFile.LoadWma;
+				formatFlag[3] = MainForm.configFile.LoadOgg;
+				formatFlag[4] = MainForm.configFile.LoadAiff;
+				formatFlag[5] = MainForm.configFile.LoadFlac;
 
 				m_mainForm.ClearSamples();
 				if (m_bUseCache)
@@ -364,9 +364,9 @@ namespace Aural_Probe
 				{
 					nDirectoryCount = 0; // reset
 					nFileCount = 0; // reset
-					for (int i = 0; i < MainForm.configFile.lnNumSearchDirectoriesScrubbed; ++i)
+					for (int i = 0; i < MainForm.configFile.SearchDirectoriesScrubbed.Count; ++i)
 					{
-						string dir = MainForm.configFile.searchDirectoriesScrubbed[i];
+						string dir = MainForm.configFile.SearchDirectoriesScrubbed[i];
 						nDirectoryCount += CountDirectoriesInDirectory(dir);
 						nFileCount += CountFilesInDirectory(dir);
 					}
@@ -381,9 +381,9 @@ namespace Aural_Probe
 						m_progressBar.Invoke(m_progressBar.m_DelegateUpdateMaximumAndStep, nDirectoryCount, -1);
 					}
 
-					for (int i = 0; i < MainForm.configFile.lnNumSearchDirectoriesScrubbed; ++i)
+					for (int i = 0; i < MainForm.configFile.SearchDirectoriesScrubbed.Count; ++i)
 					{
-						string dir = MainForm.configFile.searchDirectoriesScrubbed[i];
+						string dir = MainForm.configFile.SearchDirectoriesScrubbed[i];
 						if (dir.Length == 0)
 							continue;
 

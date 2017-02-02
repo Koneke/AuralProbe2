@@ -240,7 +240,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				for (int i = 0; i < configFile.lnNumCategories; ++i)
+				for (int i = 0; i < configFile.Categories.Count; ++i)
 				{
 					sampleFavoritesCount[i] = 0;
 					for (int j = 0; j < sampleIndicesCount[i]; ++j)
@@ -321,7 +321,7 @@ namespace Aural_Probe
 			{
 				if (lbFavoritesOnly)
 				{
-					for (int i = 0; i < configFile.lnNumCategories; ++i)
+					for (int i = 0; i < configFile.Categories.Count; ++i)
 						categoriesList.Items[i] = app.GetCategoryListName(i);
 				}
 			}
@@ -335,7 +335,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				TopMost = configFile.lbAlwaysOnTop;
+				TopMost = configFile.AlwaysOnTop;
 
 				bAutoPlayNextSample = false; // this gets set when playing a sound
 				nAutoPlayRepeatsLeft = 0; // this gets set when playing a sound
@@ -345,15 +345,15 @@ namespace Aural_Probe
 				int oldCategoriesSize = categoriesList.Items.Count;
 
 				categoriesList.Items.Clear();
-				for (int i = 0; i < configFile.lnNumCategories; ++i)
+				for (int i = 0; i < configFile.Categories.Count; ++i)
 					categoriesList.Items.Add(app.GetCategoryListName(i));
 
 				if (oldCategoriesSize == categoriesList.Items.Count)
 					categoriesList.SelectedIndex = oldIndex;
 
 				UpdateStatusBarAndLabel();
-				listSamples.ItemHeight = configFile.lnSampleDisplaySizeH;
-				listSamples.ColumnWidth = configFile.lnSampleDisplaySizeW;
+				listSamples.ItemHeight = configFile.SampleDisplaySizeH;
+				listSamples.ColumnWidth = configFile.SampleDisplaySizeW;
 
 				//sampleListMenu.MenuItems[3].Enabled = !lbFavoritesOnly; // disable favorite editing when in favorites view
 
@@ -391,7 +391,7 @@ namespace Aural_Probe
 				listSamples.Items.Clear();
 				statusBarPanel.ToolTipText = "";
 			
-				if (configFile.lnNumSearchDirectories <= 0)
+				if (configFile.SearchDirectories.Count <= 0)
 				{
 					pictureStatus.Visible = true;
 					statusLabel.Visible = true;
@@ -399,7 +399,7 @@ namespace Aural_Probe
 					statusBarPanel.Text = "Ready";
 					statusBarProperties.Text = "";
 				}
-				else if (configFile.lnNumCategories <= 0)
+				else if (configFile.Categories.Count <= 0)
 				{
 					pictureStatus.Visible = true;
 					statusLabel.Visible = true;
@@ -441,7 +441,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				for (int i = 0; i < configFile.kMaxCategories; ++i)
+				for (int i = 0; i < ConfigFile.MaxCategories; ++i)
 				{
 					sampleIndicesCount[i] = 0;
 				}
@@ -464,13 +464,19 @@ namespace Aural_Probe
 			{
 				bool bWantsToUseCache = bUseCache;
 				bUseCache = bUseCache && File.Exists(GetSampleCacheFilepath());
-				if (configFile.lnNumSearchDirectories == 0)
+				if (configFile.SearchDirectories.Count == 0)
 				{
 					if (!bWantsToUseCache) // only show this message if we're not trying to use the cache, ie. a fresh install
-						MessageBox.Show("You must configure your search folders.", "No search folders found", MessageBoxButtons.OK, MessageBoxIcon.Information);
+					{
+						MessageBox.Show(
+							"You must configure your search folders.",
+							"No search folders found",
+							MessageBoxButtons.OK,
+							MessageBoxIcon.Information);
+					}
 					return false;
 				}
-				else if (configFile.lnNumCategories == 0)
+				else if (configFile.Categories.Count == 0)
 				{
 					if (!bWantsToUseCache) // only show this message if we're not trying to use the cache, ie. a fresh install
 						MessageBox.Show("You must configure your audio sample categories.", "No categories found", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -487,7 +493,7 @@ namespace Aural_Probe
 					}
 					else
 					{
-						if (!configFile.lbRescanPrompt || DialogResult.Yes == MessageBox.Show("Would you like to scan all search folders for audio samples now?", "Scan search folders for audio samples?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
+						if (!configFile.RescanPrompt || DialogResult.Yes == MessageBox.Show("Would you like to scan all search folders for audio samples now?", "Scan search folders for audio samples?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
 						{
 							statusLabel.Text = "Please wait. Scanning folders for audio samples...";
 							Refresh();
@@ -1073,8 +1079,8 @@ namespace Aural_Probe
 			{
 				SaveFileDialog fdlg = new SaveFileDialog();
 				fdlg.Title = "Save Favorites";
-				if (configFile.defaultFavoritesDirectory.Length > 0)
-					fdlg.InitialDirectory = configFile.defaultFavoritesDirectory;
+				if (configFile.DefaultFavoritesDirectory.Length > 0)
+					fdlg.InitialDirectory = configFile.DefaultFavoritesDirectory;
 				fdlg.OverwritePrompt = true;
 				fdlg.Filter = "Aural Probe Favorites (*.apf)|*.apf|All files (*.*)|*.*";
 				fdlg.FileName = app.Files.favoritesFile.currentFavoritesFilename;
@@ -1123,8 +1129,8 @@ namespace Aural_Probe
 					}
 					else
 					{
-						bAutoPlayNextSample = configFile.lbAutoplay;
-						nAutoPlayRepeatsLeft = configFile.lnAutoplayRepeats;
+						bAutoPlayNextSample = configFile.Autoplay;
+						nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
 						listSamples_SelectedIndexChanged(sender, e);
 					}
 				}
@@ -1166,8 +1172,8 @@ namespace Aural_Probe
 					{
 						OpenFileDialog fdlg = new OpenFileDialog(); 
 						fdlg.Title = "Open Favorites" ; 
-						if (configFile.defaultFavoritesDirectory.Length > 0)
-							fdlg.InitialDirectory = configFile.defaultFavoritesDirectory;
+						if (configFile.DefaultFavoritesDirectory.Length > 0)
+							fdlg.InitialDirectory = configFile.DefaultFavoritesDirectory;
 						fdlg.Filter = "Aural Probe Favorites (*.apf)|*.apf|All files (*.*)|*.*"; 
 						fdlg.RestoreDirectory = true; 
 						if(fdlg.ShowDialog() == DialogResult.OK && fdlg.FileName.Length > 0) 
@@ -1279,7 +1285,7 @@ namespace Aural_Probe
 
 		private void listSamples_SelectedIndexChanged(object sender, System.EventArgs e)
 		{
-			nAutoPlayRepeatsLeft = configFile.lnAutoplayRepeats;
+			nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
 			listSamplesSelectedIndexChanged();
 		}
 
@@ -1395,7 +1401,7 @@ namespace Aural_Probe
 							toolBarButtonPlayStop.Enabled = listSamplesSingleSelectedIndex != -1;
 							toolBarButtonPlayStop.Text = "Stop";
 							toolBarButtonPlayStop.ImageIndex = 8;
-							bAutoPlayNextSample = configFile.lbAutoplay;
+							bAutoPlayNextSample = configFile.Autoplay;
 						}
 						FMOD.SOUND_TYPE stype = 0;
 						FMOD.SOUND_FORMAT sformat = 0;
@@ -1655,7 +1661,7 @@ namespace Aural_Probe
 					}
 					else
 					{
-						gMainForm.nAutoPlayRepeatsLeft = MainForm.configFile.lnAutoplayRepeats;
+						gMainForm.nAutoPlayRepeatsLeft = MainForm.configFile.AutoplayRepeats;
 						int newSelectedIndex = listSamplesSingleSelectedIndex + 1;
 						if (newSelectedIndex < gMainForm.listSamples.Items.Count)
 						{

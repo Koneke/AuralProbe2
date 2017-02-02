@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.IO;
 using Microsoft.Win32;
+using Newtonsoft.Json;
 
 namespace Aural_Probe
 {
@@ -39,8 +40,9 @@ namespace Aural_Probe
 		private void Init()
 		{
 			Files.workingDirectory = Directory.GetCurrentDirectory();
-			Files.configFile = new ConfigFile();
-			Files.configFile.Load();
+			Files.configFile = ConfigFile.Load();
+
+			var a = JsonConvert.SerializeObject(Files.configFile, Formatting.Indented);
 
 			lbDirtyFavorites = false;
 
@@ -68,8 +70,8 @@ namespace Aural_Probe
 				colorList[i, 1] = Color.FromArgb((int)(R * 255.0f), (int)(G * 255.0f), (int)(B * 255.0f));
 			}
 
-			Library.sampleIndicesCount = new int[Files.configFile.kMaxCategories];
-			Library.sampleFavoritesCount = new int[Files.configFile.kMaxCategories];
+			Library.sampleIndicesCount = new int[ConfigFile.MaxCategories];
+			Library.sampleFavoritesCount = new int[ConfigFile.MaxCategories];
 
 			lbFavoritesOnly = false;
 
@@ -136,7 +138,8 @@ namespace Aural_Probe
 		{
 			try
 			{
-				return Files.configFile.categoryName[i] + " (" + (lbFavoritesOnly ? Library.sampleFavoritesCount[i] : Library.sampleIndicesCount[i]).ToString() + ")";
+				// Category name, followed by number of favourites in category (if in favourite mode), or number of samples in category, in parenthesis.
+				return Files.configFile.Categories[i].Name + " (" + (lbFavoritesOnly ? Library.sampleFavoritesCount[i] : Library.sampleIndicesCount[i]).ToString() + ")";
 			}
 			catch (System.Exception e)
 			{

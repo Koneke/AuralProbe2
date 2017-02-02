@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Windows.Forms;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Linq;
+using Newtonsoft.Json;
 
 namespace Aural_Probe
 {
@@ -11,13 +11,13 @@ namespace Aural_Probe
 	/// </summary>
 	public class ConfigFile
 	{
-		private string kConfigFile = "Aural Probe.cfg";
-		private string kDefaultFile = "Default.cfg";
+		private const string ConfigFilePath = "Aural Probe.cfg.json";
+		private const string DefaultConfigFilePath = "Default.cfg.json";
+		private const string OldFormatConfigFilePath = "Aural Probe.cfg";
 
-		public int kMaxCategories = 256;
-		public int kMaxSearchStringsPerCategory = 256;
-		public int kMaxDirectories = 256;
-		public int kVersionedConfigFileID = -666;
+		[JsonIgnore] public const int MaxCategories = 256;
+		[JsonIgnore] public const int MaxSearchStringsPerCategory = 256;
+		[JsonIgnore] public const int MaxDirectories = 256;
 
 		// Version History
 		// 0 = Unversioned config file
@@ -27,161 +27,113 @@ namespace Aural_Probe
 		// 4 = Added default sound device
 		// 5 = Added always on top
 		// 6 = Added use regular expression option (per category)
+		// 7 = Switched to JSON
 		// ...
-		public int kCurrentConfigFileVersion = 6;
 
-		public string[] categoryName;
-		public string[,] categorySearchStrings;
-		public bool[] categoryUseRegularExpressions;
-		public string[] searchDirectories;
-		public string[] searchDirectoriesScrubbed;
-		public int lnNumCategories;
-		public int[] lnNumCategorySearchStrings;
-		public int lnNumSearchDirectories;
-		public int lnNumSearchDirectoriesScrubbed;
-		public int lnSampleDisplaySizeW;
-		public int lnSampleDisplaySizeH;
-		public bool lbRescanPrompt;
-		public bool lbIncludeFilePaths;
-		public bool lbAlwaysOnTop;
-		public string defaultFavoritesDirectory;
-		public bool lbAutoplay;
-		public int lnAutoplayRepeats;
-		public bool lbWAV;
-		public bool lbAIFF;
-		public bool lbFLAC;
-		public bool lbMP3;
-		public bool lbWMA;
-		public bool lbOGG;
-		public string defaultSoundDevice;
+		// Resharper complains about it not being used, but we're writing it to file.
+		// ReSharper disable once UnusedMember.Global
+		public const int CurrentConfigFileVersion = 7;
 
-		public ConfigFile()
+		public readonly List<Category> Categories;
+		public List<string> SearchDirectories;
+		public List<string> SearchDirectoriesScrubbed;
+
+		public bool RescanPrompt;
+		public bool IncludeFilePaths;
+
+		public bool AlwaysOnTop;
+		public string DefaultFavoritesDirectory;
+		public bool Autoplay;
+		public int AutoplayRepeats;
+		public bool LoadWav;
+		public bool LoadAiff;
+		public bool LoadFlac;
+		public bool LoadMp3;
+		public bool LoadWma;
+		public bool LoadOgg;
+		public string DefaultSoundDevice;
+
+		public int SampleDisplaySizeW;
+		public int SampleDisplaySizeH;
+
+		private ConfigFile()
 		{
-			categoryName = new string[kMaxCategories];
-			categorySearchStrings = new string[kMaxCategories,kMaxSearchStringsPerCategory];
-			categoryUseRegularExpressions = new bool[kMaxCategories];
-			searchDirectories = new string[kMaxDirectories];
-			lnNumCategorySearchStrings = new int[kMaxCategories];
-			lbRescanPrompt = true;
-			lbIncludeFilePaths = true;
-			lbAlwaysOnTop = false;
-			lbAutoplay = false;
-			lnAutoplayRepeats = 4;
-			lbWAV = true;
-			lbAIFF = true;
-			lbFLAC = true;
-			lbMP3 = true;
-			lbWMA = true;
-			lbOGG = true;
-			lnSampleDisplaySizeH = 32;
-			lnSampleDisplaySizeH = 192;
+			this.Categories = new List<Category>();
+
+			this.RescanPrompt = true;
+			this.IncludeFilePaths = true;
+			this.AlwaysOnTop = false;
+			this.Autoplay = false;
+			this.AutoplayRepeats = 4;
+			this.LoadWav = true;
+			this.LoadAiff = true;
+			this.LoadFlac = true;
+			this.LoadMp3 = true;
+			this.LoadWma = true;
+			this.LoadOgg = true;
+			this.SampleDisplaySizeH = 32;
+			this.SampleDisplaySizeH = 192;
 		}
 
-		private void ReadDataFromFile(string filename)
+		private static ConfigFile ConvertLegacyConfig(LegacyConfigFile legacyConfig)
 		{
-			try
+			var config = new ConfigFile();
+
+			for (var i = 0; i < legacyConfig.lnNumCategories; ++i)
 			{
-				using(Stream myFileStream = File.OpenRead(filename))
+				var searchStrings = new List<string>();
+
+				for (var j = 0; j < LegacyConfigFile.MaxSearchStringsPerCategory; ++j)
 				{
-					BinaryFormatter deserializer = new BinaryFormatter();
-					
-					int nVersion = (int)deserializer.Deserialize(myFileStream);
-					if (nVersion == kVersionedConfigFileID)
+					if (legacyConfig.categorySearchStrings[i, j] == null)
 					{
-						// We're reading a versioned config file, so read the actual version in now
-						nVersion = (int)deserializer.Deserialize(myFileStream);
-						lnNumCategories = (int)deserializer.Deserialize(myFileStream);
-					}
-					else
-					{
-						// Unversioned config file, so version is 0 and first int was actually number of categories
-						lnNumCategories = nVersion;
-						nVersion = 0;
+						break;
 					}
 
-					for(int lnCategory = 0; lnCategory < lnNumCategories; lnCategory++ )
-					{
-						categoryName[lnCategory] = (string)deserializer.Deserialize(myFileStream);
-						lnNumCategorySearchStrings[lnCategory] = (int)deserializer.Deserialize(myFileStream);
-						for(int lnSS = 0; lnSS < lnNumCategorySearchStrings[lnCategory]; lnSS++ )
-						{
-							categorySearchStrings[lnCategory,lnSS] = (string)deserializer.Deserialize(myFileStream);
-						}
-						if (nVersion >= 6)
-							categoryUseRegularExpressions[lnCategory] = (bool)deserializer.Deserialize(myFileStream);
-					}
-					lnNumSearchDirectories = (int)deserializer.Deserialize(myFileStream);
-					for(int lnSearchDirectory = 0; lnSearchDirectory < lnNumSearchDirectories; lnSearchDirectory++ )
-					{
-						searchDirectories[lnSearchDirectory] = (string)deserializer.Deserialize(myFileStream);
-					}
-					lnSampleDisplaySizeH = (int)deserializer.Deserialize(myFileStream);
-					lbRescanPrompt = (bool)deserializer.Deserialize(myFileStream);
-					lbIncludeFilePaths = (bool)deserializer.Deserialize(myFileStream);
-					if (nVersion >= 2)
-					{
-						defaultFavoritesDirectory = (string)deserializer.Deserialize(myFileStream);
-					}
-					else
-					{
-						defaultFavoritesDirectory = "";
-					}
-					if (nVersion >= 3)
-					{
-						lbAutoplay = (bool)deserializer.Deserialize(myFileStream);
-						lnAutoplayRepeats = (int)deserializer.Deserialize(myFileStream);
-						lbWAV = (bool)deserializer.Deserialize(myFileStream);
-						lbAIFF = (bool)deserializer.Deserialize(myFileStream);
-						lbFLAC = (bool)deserializer.Deserialize(myFileStream);
-						lbMP3 = (bool)deserializer.Deserialize(myFileStream);
-						lbWMA = (bool)deserializer.Deserialize(myFileStream);
-						lbOGG = (bool)deserializer.Deserialize(myFileStream);
-						lnSampleDisplaySizeW = (int)deserializer.Deserialize(myFileStream);
-					}
-					else
-					{
-						lbAutoplay = false;
-						lnAutoplayRepeats = 4;
-						lbWAV = true;
-						lbAIFF = true;
-						lbFLAC = true;
-						lbMP3 = true;
-						lbWMA = true;
-						lbOGG = true;
-						lnSampleDisplaySizeW = lnSampleDisplaySizeH * 6;
-					}
-					if (nVersion >= 4)
-					{
-						defaultSoundDevice = (string)deserializer.Deserialize(myFileStream);
-					}
-					else
-					{
-						defaultSoundDevice = "";
-					}
-					if (nVersion >= 5)
-					{
-						lbAlwaysOnTop = (bool)deserializer.Deserialize(myFileStream);
-					}
-					else
-					{
-						lbAlwaysOnTop = false;
-					}
+					searchStrings.Add(legacyConfig.categorySearchStrings[i, j]);
 				}
+
+				config.Categories.Add(new Category {
+					Name = legacyConfig.categoryName[i],
+					SearchStrings = searchStrings,
+					UseRegex = legacyConfig.categoryUseRegularExpressions[i]
+				});
 			}
-			catch
-			{
-			}
+
+			config.SearchDirectories = legacyConfig.searchDirectories.Where(sd => sd != null).ToList();
+
+			config.DefaultFavoritesDirectory = legacyConfig.defaultFavoritesDirectory;
+			config.RescanPrompt = legacyConfig.lbRescanPrompt;
+			config.IncludeFilePaths = legacyConfig.lbIncludeFilePaths;
+			config.AlwaysOnTop = legacyConfig.lbAlwaysOnTop;
+			config.Autoplay = legacyConfig.lbAutoplay;
+			config.AutoplayRepeats = legacyConfig.lnAutoplayRepeats;
+			config.LoadWav = legacyConfig.lbWAV;
+			config.LoadAiff = legacyConfig.lbAIFF;
+			config.LoadFlac = legacyConfig.lbFLAC;
+			config.LoadMp3 = legacyConfig.lbMP3;
+			config.LoadWma = legacyConfig.lbWMA;
+			config.LoadOgg = legacyConfig.lbOGG;
+			config.SampleDisplaySizeH = legacyConfig.lnSampleDisplaySizeH;
+			config.SampleDisplaySizeW = legacyConfig.lnSampleDisplaySizeW;
+			config.DefaultSoundDevice = legacyConfig.defaultSoundDevice;
+
+			return config;
 		}
 
-		public void UpdateScrubbedSearchDirectories()
+		// scrub = search..?
+		// i.e. basically look in, find samples, or whatever
+		private void UpdateScrubbedSearchDirectories()
 		{
-			System.Collections.ArrayList newList = new System.Collections.ArrayList();
+			var scrubbedList = new List<string>();
 
-			lnNumSearchDirectoriesScrubbed = 0;
-
-			for (int i = 0; i < lnNumSearchDirectories; ++i)
+			// honestly I don't see exactly what this thing is for?
+			// I'm guessing if you have several search directories, and they overlap in some manner?
+			// or something like that?
+			foreach (var searchDirectory in this.SearchDirectories)
 			{
-				string str = searchDirectories[i].ToLower();
+				var str = searchDirectory?.ToLower();
+
 				if (str == null)
 				{
 					continue;
@@ -189,133 +141,108 @@ namespace Aural_Probe
 
 				if (Directory.Exists(str))
 				{
-					if (!newList.Contains(str))    // skip duplicates
+					// skip duplicates
+					// (or maybe just like, yknow, don't allowed duplicates)
+					// (probably better way of handling this)
+					if (!scrubbedList.Contains(str))
 					{
-						bool bAlreadyContainedByOtherDirectory = false;
-						for (int j = 0; j < lnNumSearchDirectories; ++j)
+						var bAlreadyContainedByOtherDirectory = false;
+
+						//for (int j = 0; j < lnNumSearchDirectories; ++j)
+						foreach (var secondSearchDirectory in this.SearchDirectories)
 						{
-							if (i == j)
-								continue;
+							var newStr = secondSearchDirectory?.ToLower();
 
-							string newStr = searchDirectories[j].ToLower();
 							if (newStr == null || str == newStr)
+							{
 								continue;
+							}
 
-							if (str.IndexOf(newStr) != -1)
+							if (str.IndexOf(newStr, StringComparison.Ordinal) != -1)
 							{
 								bAlreadyContainedByOtherDirectory = true;
 								break;
 							}
 						}
+
 						if (!bAlreadyContainedByOtherDirectory)
 						{
-							newList.Add(searchDirectories[i]);
-							lnNumSearchDirectoriesScrubbed++;
+							scrubbedList.Add(searchDirectory);
 						}
 					}
 				}
 			}
 
-			searchDirectoriesScrubbed = (string[])newList.ToArray(typeof(string));
+			this.SearchDirectoriesScrubbed = scrubbedList;
 		}
 
-		public string GetConfigFilePath()
+		private static string GetOldFormatConfigFilePath()
 		{
-			return MainForm.GetApplicationDataPath() + "\\" + kConfigFile;
+			return MainForm.GetApplicationDataPath() + "\\" + OldFormatConfigFilePath;
 		}
 
-		public void Load()
+		private static string GetConfigFilePath()
 		{
+			return MainForm.GetApplicationDataPath() + "\\" + ConfigFilePath;
+		}
+
+		private static ConfigFile LoadJsonConfig(string path)
+		{
+			var json = File.ReadAllText(path);
+			var configFile = JsonConvert.DeserializeObject<ConfigFile>(json);
+			return configFile;
+		}
+
+		public static ConfigFile Load()
+		{
+			ConfigFile config;
+
 			Directory.SetCurrentDirectory(MainForm.workingDirectory);
-			bool bConfigExists = File.Exists(GetConfigFilePath());
-			bool bOldConfigExists = File.Exists( kConfigFile );
-			bool bDefaultExists = File.Exists( kDefaultFile );
-			if (bConfigExists)
+
+			var configExists = File.Exists(GetConfigFilePath());
+			var defaultExists = File.Exists(DefaultConfigFilePath);
+
+			var oldFormatConfigExists = File.Exists(GetOldFormatConfigFilePath());
+			var oldOldFormatConfigExists = File.Exists(OldFormatConfigFilePath);
+
+			if (configExists)
 			{
-				ReadDataFromFile(GetConfigFilePath());
+				config = LoadJsonConfig(GetConfigFilePath());
 			}
-			else if (bOldConfigExists)
+			else if (oldFormatConfigExists || oldOldFormatConfigExists)
 			{
-				ReadDataFromFile(kConfigFile);
+				config = ConvertLegacyConfig(LegacyConfigFile.CreateAndLoad());
 			}
-			else if (bDefaultExists)
+			else if (defaultExists)
 			{
-				ReadDataFromFile(kDefaultFile);
-				lnSampleDisplaySizeW = 192;
-				lnSampleDisplaySizeH = 32;
+				config = LoadJsonConfig(DefaultConfigFilePath);
 			}
 			else
 			{
-				// Set up defaults
-				lnNumCategories = 1;
-				categoryName[0] = "All Samples";
-				lnNumSearchDirectories = 0;
-				lnSampleDisplaySizeW = 192;
-				lnSampleDisplaySizeH = 32;
+				config = new ConfigFile
+				{
+					// Set up defaults
+					SampleDisplaySizeW = 192,
+					SampleDisplaySizeH = 32
+				};
+
+				config.Categories.Add(new Category {
+					Name = "All Samples"
+				});
 			}
 
-			UpdateScrubbedSearchDirectories();
+			config.UpdateScrubbedSearchDirectories();
+
+			return config;
 		}
 
 		public void Save()
 		{
-			try
-			{
-				System.IO.Directory.CreateDirectory(MainForm.GetApplicationDataPath());
-				using (Stream myFileStream = File.OpenWrite(GetConfigFilePath()))
-				{
-					BinaryFormatter serializer = new BinaryFormatter();
-					serializer.Serialize(myFileStream, kVersionedConfigFileID);
-					serializer.Serialize(myFileStream, kCurrentConfigFileVersion);
-					serializer.Serialize(myFileStream, lnNumCategories);
-					for(int lnCategory = 0; lnCategory < lnNumCategories; lnCategory++ )
-					{
-						serializer.Serialize(myFileStream, categoryName[lnCategory]);
-						serializer.Serialize(myFileStream, lnNumCategorySearchStrings[lnCategory]);
-						for(int lnSS = 0; lnSS < lnNumCategorySearchStrings[lnCategory]; lnSS++ )
-						{
-							serializer.Serialize(myFileStream, categorySearchStrings[lnCategory,lnSS].ToString());
-						}
-						serializer.Serialize(myFileStream, categoryUseRegularExpressions[lnCategory]);
-					}
-					serializer.Serialize(myFileStream, lnNumSearchDirectories);
-					for(int lnSearchDirectory = 0; lnSearchDirectory < lnNumSearchDirectories; lnSearchDirectory++ )
-					{
-						serializer.Serialize(myFileStream, searchDirectories[lnSearchDirectory].ToString());
-					}
-					serializer.Serialize(myFileStream, lnSampleDisplaySizeH);
-					serializer.Serialize(myFileStream, lbRescanPrompt);
-					serializer.Serialize(myFileStream, lbIncludeFilePaths);
-					serializer.Serialize(myFileStream, defaultFavoritesDirectory);
+			File.WriteAllText(
+				GetConfigFilePath(),
+				JsonConvert.SerializeObject(this, Formatting.Indented));
 
-					serializer.Serialize(myFileStream, lbAutoplay);
-					serializer.Serialize(myFileStream, lnAutoplayRepeats);
-					serializer.Serialize(myFileStream, lbWAV);
-					serializer.Serialize(myFileStream, lbAIFF);
-					serializer.Serialize(myFileStream, lbFLAC);
-					serializer.Serialize(myFileStream, lbMP3);
-					serializer.Serialize(myFileStream, lbWMA);
-					serializer.Serialize(myFileStream, lbOGG);
-					serializer.Serialize(myFileStream, lnSampleDisplaySizeW);
-					serializer.Serialize(myFileStream, defaultSoundDevice);
-
-					serializer.Serialize(myFileStream, lbAlwaysOnTop);
-				}
-
-				UpdateScrubbedSearchDirectories();
-			}
-			catch (Exception ex)
-			{
-				MessageBox.Show("Error! Could not save config file! " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-				try
-				{
-					File.Delete(GetConfigFilePath());
-				}
-				catch (Exception ex2)
-				{
-					MessageBox.Show("Error! Could not delete config file! " + ex2.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-				}
-			}
+			this.UpdateScrubbedSearchDirectories();
 		}
 	}
 }

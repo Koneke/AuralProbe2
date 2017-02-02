@@ -64,7 +64,7 @@ namespace Aural_Probe
 				result = systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
 				fmodUtils.ERRCHECK(result);
 
-				if (driverName.ToString() == app.Files.configFile.defaultSoundDevice)
+				if (driverName.ToString() == app.Files.configFile.DefaultSoundDevice)
 				{
 					result = systemFMOD.setDriver(count);
 					fmodUtils.ERRCHECK(result);

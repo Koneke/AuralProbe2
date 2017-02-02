@@ -9,6 +9,9 @@ namespace Aural_Probe
 	/// <summary>
 	/// Summary description for Configuration.
 	/// </summary>
+
+	// for stuff in the configuration menu
+	// kinda weird and copied up from ConfigFile, but I guess this is the more "proper" way?
 	public class ConfigurationForm : Form
 	{
 		private Button buttonOK;
@@ -29,7 +32,7 @@ namespace Aural_Probe
 		public string[] categoryName;
 		public string[,] categorySearchStrings;
 		public bool[] categoryUseRegularExpressions;
-		public string[] searchDirectories;		
+		public string[] searchDirectories;
 		public int lnNumCategories;
 		public int[] lnNumCategorySearchStrings;
 		public int lnNumSearchDirectories;
@@ -73,11 +76,11 @@ namespace Aural_Probe
 			//
 			InitializeComponent();
 
-			categoryName = new string[MainForm.configFile.kMaxCategories];
-			categorySearchStrings = new string[MainForm.configFile.kMaxCategories,MainForm.configFile.kMaxSearchStringsPerCategory];
-			categoryUseRegularExpressions = new bool[MainForm.configFile.kMaxCategories];
-			searchDirectories = new string[MainForm.configFile.kMaxDirectories];
-			lnNumCategorySearchStrings = new int[MainForm.configFile.kMaxCategories];
+			categoryName = new string[ConfigFile.MaxCategories];
+			categorySearchStrings = new string[ConfigFile.MaxCategories, ConfigFile.MaxSearchStringsPerCategory];
+			categoryUseRegularExpressions = new bool[ConfigFile.MaxCategories];
+			searchDirectories = new string[ConfigFile.MaxDirectories];
+			lnNumCategorySearchStrings = new int[ConfigFile.MaxCategories];
 		}
 
 		public void InitSoundOutputUI()
@@ -85,21 +88,23 @@ namespace Aural_Probe
 			// Set up device output combo box
 			FMOD.RESULT result;
 			comboOutputDevice.Items.Clear();
-			int nCurrentDriver = 0;
-			int numDrivers = 0;
-			StringBuilder driverName = new StringBuilder(256);
+			var nCurrentDriver = 0;
+			var numDrivers = 0;
+			var driverName = new StringBuilder(256);
 			result = MainForm.app.fmodManager.systemFMOD.getDriver(ref nCurrentDriver);
 			fmodUtils.ERRCHECK(result);
 			
 			// hack to select primary sound device - will this work???
 			if (nCurrentDriver == -1)
+			{
 				nCurrentDriver = 0;
+			}
 
 			result = MainForm.app.fmodManager.systemFMOD.getNumDrivers(ref numDrivers);
 			fmodUtils.ERRCHECK(result);
-			for (int count = 0; count < numDrivers; count++)
+			for (var count = 0; count < numDrivers; count++)
 			{
-				FMOD.GUID guid = new FMOD.GUID();
+				var guid = new FMOD.GUID();
 				result = MainForm.app.fmodManager.systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
 				fmodUtils.ERRCHECK(result);
 				comboOutputDevice.Items.Add(driverName.ToString());
@@ -110,155 +115,157 @@ namespace Aural_Probe
 
 		public void ChangeSoundOutput()
 		{
-			int nSelectedOutputDevice = comboOutputDevice.SelectedIndex;
+			var nSelectedOutputDevice = comboOutputDevice.SelectedIndex;
+
 			if (nSelectedOutputDevice == 0)
+			{
 				nSelectedOutputDevice = -1;
+			}
+
 			if (nSelectedOutputDevice < comboOutputDevice.Items.Count)
 			{
 				if (MainForm.sound != null)
+				{
 					MainForm.sound.release();
+				}
+
 				MainForm.sound = null;
 
 				MainForm.app.fmodManager.systemFMOD.close();
 				MainForm.app.fmodManager.systemFMOD.setDriver(nSelectedOutputDevice);
-				FMOD.RESULT result = MainForm.app.fmodManager.systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
+				var result = MainForm.app.fmodManager.systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
 				fmodUtils.ERRCHECK(result);
 			}
 		}
 
-		public void InitFromConfigFile(object sender, System.EventArgs e)
+		private void InitFromConfigFile(object sender, System.EventArgs e)
 		{
-			numericSampleDisplaySizeW.Value = MainForm.configFile.lnSampleDisplaySizeW;
-			numericSampleDisplaySizeH.Value = MainForm.configFile.lnSampleDisplaySizeH;
-			numericAutoplayRepeats.Value = MainForm.configFile.lnAutoplayRepeats;
+			this.numericSampleDisplaySizeW.Value = MainForm.configFile.SampleDisplaySizeW;
+			this.numericSampleDisplaySizeH.Value = MainForm.configFile.SampleDisplaySizeH;
+			this.numericAutoplayRepeats.Value = MainForm.configFile.AutoplayRepeats;
 
-			listCategories.Items.Clear();
-			lnNumCategories = MainForm.configFile.lnNumCategories;
-			for (int i = 0; i < MainForm.configFile.lnNumCategories; ++i)
+			this.listCategories.Items.Clear();
+
+			this.lnNumCategories = MainForm.configFile.Categories.Count;
+			for (var i = 0; i < MainForm.configFile.Categories.Count; ++i)
 			{
-				categoryName[i] = MainForm.configFile.categoryName[i];
-				lnNumCategorySearchStrings[i] = MainForm.configFile.lnNumCategorySearchStrings[i];
-				string categoryListName = "";
-				categoryListName += MainForm.configFile.categoryName[i] + "\t";
-				for (int j = 0, k = MainForm.configFile.lnNumCategorySearchStrings[i]; j < k; j++)
-				{
-					categorySearchStrings[i, j] = MainForm.configFile.categorySearchStrings[i, j];
-					categoryListName += MainForm.configFile.categorySearchStrings[i, j];
-					if (j < k - 1)
-						categoryListName += ",";
-				}
-				categoryUseRegularExpressions[i] = MainForm.configFile.categoryUseRegularExpressions[i];
-				listCategories.Items.Add(categoryListName);
+				this.categoryName[i] = MainForm.configFile.Categories[i].Name;
+				this.lnNumCategorySearchStrings[i] = MainForm.configFile.Categories[i].SearchStrings.Count;
+				var categoryListName = "";
+				categoryListName += MainForm.configFile.Categories[i].Name + "\t";
+				categoryListName += string.Join(",", MainForm.configFile.Categories[i].SearchStrings);
+
+				this.categoryUseRegularExpressions[i] = MainForm.configFile.Categories[i].UseRegex;
+				this.listCategories.Items.Add(categoryListName);
 			}
-			listCategories.SelectedIndex = MainForm.configFile.lnNumCategories > 0 ? 0 : -1;
-			checkBoxRescanPrompt.Checked = MainForm.configFile.lbRescanPrompt;
-			checkBoxIncludeFilePaths.Checked = MainForm.configFile.lbIncludeFilePaths;
-			checkBoxAutoplay.Checked = MainForm.configFile.lbAutoplay;
-			checkBoxAlwaysOnTop.Checked = MainForm.configFile.lbAlwaysOnTop;
-			numericAutoplayRepeats.Enabled = checkBoxAutoplay.Checked;
 
-			checkBoxWAV.Checked = MainForm.configFile.lbWAV;
-			checkBoxAIFF.Checked = MainForm.configFile.lbAIFF;
-			checkBoxFLAC.Checked = MainForm.configFile.lbFLAC;
-			checkBoxMP3.Checked = MainForm.configFile.lbMP3;
-			checkBoxWMA.Checked = MainForm.configFile.lbWMA;
-			checkBoxOGG.Checked = MainForm.configFile.lbOGG;
+			this.listCategories.SelectedIndex = MainForm.configFile.Categories.Count > 0 ? 0 : -1;
+			this.checkBoxRescanPrompt.Checked = MainForm.configFile.RescanPrompt;
+			this.checkBoxIncludeFilePaths.Checked = MainForm.configFile.IncludeFilePaths;
+			this.checkBoxAutoplay.Checked = MainForm.configFile.Autoplay;
+			this.checkBoxAlwaysOnTop.Checked = MainForm.configFile.AlwaysOnTop;
+			this.numericAutoplayRepeats.Enabled = checkBoxAutoplay.Checked;
 
-			textDirectories.Clear();
-			lnNumSearchDirectories = MainForm.configFile.lnNumSearchDirectories;
-			string[] dirsTemp = new string[lnNumSearchDirectories];
-			for (int i = 0; i < MainForm.configFile.lnNumSearchDirectories; ++i)
+			this.checkBoxWAV.Checked = MainForm.configFile.LoadWav;
+			this.checkBoxAIFF.Checked = MainForm.configFile.LoadAiff;
+			this.checkBoxFLAC.Checked = MainForm.configFile.LoadFlac;
+			this.checkBoxMP3.Checked = MainForm.configFile.LoadMp3;
+			this.checkBoxWMA.Checked = MainForm.configFile.LoadWma;
+			this.checkBoxOGG.Checked = MainForm.configFile.LoadOgg;
+
+			this.textDirectories.Clear();
+			this.lnNumSearchDirectories = MainForm.configFile.SearchDirectories.Count;
+
+			var dirsTemp = new string[this.lnNumSearchDirectories];
+			for (var i = 0; i < MainForm.configFile.SearchDirectories.Count; ++i)
 			{
-				dirsTemp[i] = searchDirectories[i] = MainForm.configFile.searchDirectories[i];
+				dirsTemp[i] = this.searchDirectories[i] = MainForm.configFile.SearchDirectories[i];
 			}
-			textDirectories.Lines = dirsTemp;
+			this.textDirectories.Lines = dirsTemp;
 
-			textBoxDefaultFavorites.Text = MainForm.configFile.defaultFavoritesDirectory;
+			this.textBoxDefaultFavorites.Text = MainForm.configFile.DefaultFavoritesDirectory;
 
-			InitSoundOutputUI();
+			this.InitSoundOutputUI();
 
-			bDataDirty = false;
-			bNeedToRescanFolders = false;
+			this.bDataDirty = false;
+			this.bNeedToRescanFolders = false;
 		}
 
 		public void SaveToConfigFile()
 		{
 			if (bDataDirty)
 			{
-				MainForm.configFile.lnSampleDisplaySizeW = (int)numericSampleDisplaySizeW.Value;
-				MainForm.configFile.lnSampleDisplaySizeH = (int)numericSampleDisplaySizeH.Value;
-				MainForm.configFile.lnAutoplayRepeats = (int)numericAutoplayRepeats.Value;
+				MainForm.configFile.SampleDisplaySizeW = (int)numericSampleDisplaySizeW.Value;
+				MainForm.configFile.SampleDisplaySizeH = (int)numericSampleDisplaySizeH.Value;
+				MainForm.configFile.AutoplayRepeats = (int)numericAutoplayRepeats.Value;
 
-				MainForm.configFile.lnNumCategories = lnNumCategories;
-				for (int i = 0; i < MainForm.configFile.lnNumCategories; ++i)
+				for (var i = 0; i < MainForm.configFile.Categories.Count; ++i)
 				{
-					MainForm.configFile.categoryName[i] = categoryName[i];
-					MainForm.configFile.lnNumCategorySearchStrings[i] = lnNumCategorySearchStrings[i];
-					for (int j = 0; j < lnNumCategorySearchStrings[i]; ++j)
+					MainForm.configFile.Categories[i].Name = categoryName[i];
+
+					for (var j = 0; j < lnNumCategorySearchStrings[i]; ++j)
 					{
-						MainForm.configFile.categorySearchStrings[i,j] = categorySearchStrings[i,j];
+						MainForm.configFile.Categories[i].SearchStrings[j] = categorySearchStrings[i,j];
 					}
-					MainForm.configFile.categoryUseRegularExpressions[i] = categoryUseRegularExpressions[i];
+
+					MainForm.configFile.Categories[i].UseRegex = categoryUseRegularExpressions[i];
 				}
 
 				// do directories
-				string directories = textDirectories.Text;
-				string delimStr = ",;\n\t\r";
-				char[] delimiter = delimStr.ToCharArray();
+				var directories = textDirectories.Text;
+				var delimStr = ",;\n\t\r";
+				var delimiter = delimStr.ToCharArray();
 				string[] split = null;
-				split = directories.Split(delimiter, MainForm.configFile.kMaxSearchStringsPerCategory);
+				split = directories.Split(delimiter, ConfigFile.MaxSearchStringsPerCategory);
 				lnNumSearchDirectories = 0;
 				
 				// update new search directories
-				string invalidDirectories = "";
-				for (int i = 0; i < split.Length; ++i)
+				var invalidDirectories = "";
+				for (var i = 0; i < split.Length; ++i)
 				{
 					if (split[i].Length > 0)
 					{
 						if (!Directory.Exists(split[i]))
 							invalidDirectories += split[i] + "\n";
 
-						MainForm.configFile.searchDirectories[lnNumSearchDirectories] = searchDirectories[lnNumSearchDirectories] = split[i];
+						MainForm.configFile.SearchDirectories[lnNumSearchDirectories] = searchDirectories[lnNumSearchDirectories] = split[i];
 						lnNumSearchDirectories++;
 					}
 				}
 				if (invalidDirectories != "")
 					MessageBox.Show("Warning! The following search folders do not exist:\n\n" + invalidDirectories, "Warning!", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-				MainForm.configFile.lnNumSearchDirectories = lnNumSearchDirectories;
-				MainForm.configFile.lbRescanPrompt = checkBoxRescanPrompt.Checked;
-				MainForm.configFile.lbIncludeFilePaths = checkBoxIncludeFilePaths.Checked;
-				MainForm.configFile.lbAutoplay = checkBoxAutoplay.Checked;
-				MainForm.configFile.lbAlwaysOnTop = checkBoxAlwaysOnTop.Checked;
-				MainForm.configFile.defaultFavoritesDirectory = textBoxDefaultFavorites.Text;
+				MainForm.configFile.RescanPrompt = checkBoxRescanPrompt.Checked;
+				MainForm.configFile.IncludeFilePaths = checkBoxIncludeFilePaths.Checked;
+				MainForm.configFile.Autoplay = checkBoxAutoplay.Checked;
+				MainForm.configFile.AlwaysOnTop = checkBoxAlwaysOnTop.Checked;
+				MainForm.configFile.DefaultFavoritesDirectory = textBoxDefaultFavorites.Text;
 
-				MainForm.configFile.lbWAV = MainForm.configFile.lbWAV = checkBoxWAV.Checked;	
-				MainForm.configFile.lbAIFF = MainForm.configFile.lbAIFF = checkBoxAIFF.Checked;	
-				MainForm.configFile.lbFLAC = MainForm.configFile.lbFLAC = checkBoxFLAC.Checked;	
-				MainForm.configFile.lbMP3 = MainForm.configFile.lbMP3 = checkBoxMP3.Checked;	
-				MainForm.configFile.lbWMA = MainForm.configFile.lbWMA = checkBoxWMA.Checked;	
-				MainForm.configFile.lbOGG = MainForm.configFile.lbOGG = checkBoxOGG.Checked;	
+				MainForm.configFile.LoadWav = MainForm.configFile.LoadWav = checkBoxWAV.Checked;	
+				MainForm.configFile.LoadAiff = MainForm.configFile.LoadAiff = checkBoxAIFF.Checked;	
+				MainForm.configFile.LoadFlac = MainForm.configFile.LoadFlac = checkBoxFLAC.Checked;	
+				MainForm.configFile.LoadMp3 = MainForm.configFile.LoadMp3 = checkBoxMP3.Checked;	
+				MainForm.configFile.LoadWma = MainForm.configFile.LoadWma = checkBoxWMA.Checked;	
+				MainForm.configFile.LoadOgg = MainForm.configFile.LoadOgg = checkBoxOGG.Checked;	
 
-				MainForm.configFile.defaultSoundDevice = comboOutputDevice.Text;
+				MainForm.configFile.DefaultSoundDevice = comboOutputDevice.Text;
 
 				MainForm.configFile.Save();
 
-				bDataDirty = false;
+				this.bDataDirty = false;
 			}
 		}
 
 		/// <summary>
 		/// Clean up any resources being used.
 		/// </summary>
-		protected override void Dispose( bool disposing )
+		protected override void Dispose(bool disposing)
 		{
-			if( disposing )
+			if (disposing)
 			{
-				if(components != null)
-				{
-					components.Dispose();
-				}
+				this.components?.Dispose();
 			}
+
 			base.Dispose( disposing );
 		}
 
@@ -808,39 +815,45 @@ namespace Aural_Probe
 
 		private void button1_Click(object sender, System.EventArgs e)
 		{
-			DialogResult = DialogResult.Cancel;
-			Close();
+			this.DialogResult = DialogResult.Cancel;
+			this.Close();
 		}
 
 		private void textBox1_TextChanged(object sender, System.EventArgs e)
 		{
-		
 		}
 
 		private void buttonOK_Click(object sender, System.EventArgs e)
 		{
-			if (bNeedToRescanFolders)
-				DialogResult = DialogResult.Retry;
-			else if (bDataDirty)
-				DialogResult = DialogResult.OK;
+			if (this.bNeedToRescanFolders)
+			{
+				this.DialogResult = DialogResult.Retry;
+			}
+			else if (this.bDataDirty)
+			{
+				this.DialogResult = DialogResult.OK;
+			}
 			else
-				DialogResult = DialogResult.Cancel;
-			SaveToConfigFile();
-			Close();
+			{
+				this.DialogResult = DialogResult.Cancel;
+			}
+
+			this.SaveToConfigFile();
+			this.Close();
 		}
 
 		private void buttonInsert_Click(object sender, System.EventArgs e)
 		{
-			string name = textName.Text.ToString();
-			string wildcard = textWildcard.Text.ToString();
-			bool useRegularExpressions = checkBoxUseRegularExpressions.Checked;
+			var name = this.textName.Text;
+			var wildcard = this.textWildcard.Text;
+			var useRegularExpressions = this.checkBoxUseRegularExpressions.Checked;
 
 			if (useRegularExpressions)
 			{
 				try
 				{
-					Regex r = new Regex(wildcard);
-					Match m = r.Match("Test");
+					var r = new Regex(wildcard);
+					var m = r.Match("Test");
 				}
 				catch (ArgumentException)
 				{
@@ -860,12 +873,12 @@ namespace Aural_Probe
 				}
 				else 
 				{
-					string delimStr = ",;";
-					char[] delimiter = delimStr.ToCharArray();
+					var delimStr = ",;";
+					var delimiter = delimStr.ToCharArray();
 					string[] split = null;
-					split = wildcard.Split(delimiter, MainForm.configFile.kMaxSearchStringsPerCategory);
-					int i = 0;
-					foreach (string s in split)
+					split = wildcard.Split(delimiter, ConfigFile.MaxSearchStringsPerCategory);
+					var i = 0;
+					foreach (var s in split)
 					{
 						if (s.Length > 0)
 						{
@@ -879,7 +892,7 @@ namespace Aural_Probe
 				textWildcard.Text = "";
 				checkBoxUseRegularExpressions.Checked = false;
 
-				string categoryListName = "";
+				var categoryListName = "";
 				categoryListName += categoryName[lnNumCategories] + "\t";
 				for (int j = 0, k = lnNumCategorySearchStrings[lnNumCategories]; j < k; j++)
 				{
@@ -900,16 +913,16 @@ namespace Aural_Probe
 		private void buttonDelete_Click(object sender, System.EventArgs e)
 		{
 			// Delete selected item from list!
-			int index = listCategories.SelectedIndex;
+			var index = listCategories.SelectedIndex;
 			if (index > 0)
 			{
 				listCategories.Items.RemoveAt(index);
 				lnNumCategorySearchStrings[index] = 0;
 				lnNumCategories--;
-				for (int i = index; i < lnNumCategories; i++)
+				for (var i = index; i < lnNumCategories; i++)
 				{
 					lnNumCategorySearchStrings[i] = lnNumCategorySearchStrings[i+1];
-					for (int j = 0; j < MainForm.configFile.kMaxSearchStringsPerCategory; ++j)
+					for (var j = 0; j < ConfigFile.MaxSearchStringsPerCategory; ++j)
 						categorySearchStrings[i,j] = categorySearchStrings[i+1,j];
 					categoryName[i] = categoryName[i+1];
 					categoryUseRegularExpressions[i] = categoryUseRegularExpressions[i + 1];
@@ -939,20 +952,20 @@ namespace Aural_Probe
 		private void buttonReplace_Click(object sender, System.EventArgs e)
 		{
 			// Replace selected item in list!
-			int index = listCategories.SelectedIndex;
+			var index = listCategories.SelectedIndex;
 			if (index <= 0)
 				return; // should never get here
 
-			string name = textName.Text.ToString();
-			string wildcard = textWildcard.Text.ToString();
-			bool useRegularExpressions = checkBoxUseRegularExpressions.Checked;
+			var name = textName.Text.ToString();
+			var wildcard = textWildcard.Text.ToString();
+			var useRegularExpressions = checkBoxUseRegularExpressions.Checked;
 
 			if (useRegularExpressions)
 			{
 				try
 				{
-					Regex r = new Regex(wildcard);
-					Match m = r.Match("Test");
+					var r = new Regex(wildcard);
+					var m = r.Match("Test");
 				}
 				catch (ArgumentException)
 				{
@@ -972,12 +985,12 @@ namespace Aural_Probe
 				}
 				else
 				{
-					string delimStr = ",;";
-					char[] delimiter = delimStr.ToCharArray();
+					var delimStr = ",;";
+					var delimiter = delimStr.ToCharArray();
 					string[] split = null;
-					split = wildcard.Split(delimiter, MainForm.configFile.kMaxSearchStringsPerCategory);
-					int i = 0;
-					foreach (string s in split)
+					split = wildcard.Split(delimiter, ConfigFile.MaxSearchStringsPerCategory);
+					var i = 0;
+					foreach (var s in split)
 					{
 						if (s.Length > 0)
 						{
@@ -991,7 +1004,7 @@ namespace Aural_Probe
 				textWildcard.Text = "";
 				checkBoxUseRegularExpressions.Checked = false;
 
-				string categoryListName = "";
+				var categoryListName = "";
 				categoryListName += categoryName[index] + "\t";
 				for (int j = 0, k = lnNumCategorySearchStrings[index]; j < k; j++)
 				{
@@ -1011,7 +1024,7 @@ namespace Aural_Probe
 		private void listCategories_SelectedIndexChanged(object sender, System.EventArgs e)
 		{
 			// Replace selected item in list!
-			int index = listCategories.SelectedIndex;
+			var index = listCategories.SelectedIndex;
 			if (index == -1)
 				return; // should never get here
 
@@ -1029,7 +1042,7 @@ namespace Aural_Probe
 				return;
 			}
 
-			string wildcard = "";
+			var wildcard = "";
 			for (int j = 0, k = lnNumCategorySearchStrings[index]; j < k; j++)
 			{
 				wildcard += categorySearchStrings[index, j];
@@ -1166,7 +1179,7 @@ namespace Aural_Probe
 
 		public static void Swap<T>(ref T lhs, ref T rhs)
 		{
-			T temp = lhs;
+			var temp = lhs;
 			lhs = rhs;
 			rhs = temp;
 		}
@@ -1174,21 +1187,21 @@ namespace Aural_Probe
 		private void buttonMove(bool bUp)
 		{
 			// Move selected item in list up or down one
-			int index = listCategories.SelectedIndex;
+			var index = listCategories.SelectedIndex;
 			if (bUp && index <= 1)
 				return; // should never get here
 			if (!bUp && index >= listCategories.Items.Count - 1)
 				return; // should never get here
 
-			int targetIndex = bUp ? index - 1 : index + 1;
+			var targetIndex = bUp ? index - 1 : index + 1;
 
 			Swap(ref categoryName[targetIndex], ref categoryName[index]);
 			Swap(ref categoryUseRegularExpressions[targetIndex], ref categoryUseRegularExpressions[index]);
-			for (int i = 0; i < MainForm.configFile.kMaxSearchStringsPerCategory; ++i)
+			for (var i = 0; i < ConfigFile.MaxSearchStringsPerCategory; ++i)
 				Swap(ref categorySearchStrings[targetIndex, i], ref categorySearchStrings[index, i]);
 			Swap(ref lnNumCategorySearchStrings[targetIndex], ref lnNumCategorySearchStrings[index]);
 
-			string tmp = (string)listCategories.Items[targetIndex];
+			var tmp = (string)listCategories.Items[targetIndex];
 			listCategories.Items[targetIndex] = listCategories.Items[index]; // clear the value before setting it, otherwise it won't update for case changes (eg. a to A)
 			listCategories.Items[index] = tmp;
 
@@ -1206,6 +1219,5 @@ namespace Aural_Probe
 		{
 			buttonMove(false);
 		}
-
 	}
 }

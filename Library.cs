@@ -1,4 +1,5 @@
-﻿using System.Windows.Forms;
+﻿using System.Collections.Generic;
+using System.Windows.Forms;
 
 namespace Aural_Probe
 {
@@ -12,11 +13,16 @@ namespace Aural_Probe
 
 	public class Category
 	{
+		public string Name;
+		public List<string> SearchStrings;
+		public bool UseRegex;
 	}
 
 	public class Library
 	{
 		private App app;
+
+		public List<Category> Categories;
 
 		public string[] sampleList;
 		public int[] sampleColorIndex;
@@ -37,7 +43,7 @@ namespace Aural_Probe
 				sampleList = new string[nSize];
 				sampleColorIndex = new int[nSize];
 				sampleBitField = new int[nSize];
-				sampleIndices = new int[app.Files.configFile.kMaxCategories,nSize];
+				sampleIndices = new int[ConfigFile.MaxCategories,nSize];
 			}
 			catch (System.Exception ex)
 			{
