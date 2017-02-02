@@ -105,6 +105,7 @@
     <Compile Include="AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="ColorUtils.cs" />
     <Compile Include="ConfigFile.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -120,6 +121,7 @@
     <Compile Include="fmod_dsp.cs" />
     <Compile Include="fmod_errors.cs" />
     <Compile Include="fmod_memoryinfo.cs" />
+    <Compile Include="Library.cs" />
     <Compile Include="Main.cs">
       <SubType>Form</SubType>
     </Compile>

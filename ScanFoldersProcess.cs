@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 using System.Threading;
-using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
 
@@ -23,6 +22,7 @@ namespace Aural_Probe
 			"*.aif",
 			"*.flac"
 		};
+
 		static public bool[] formatFlag =
 		{
 			true,
@@ -53,7 +53,8 @@ namespace Aural_Probe
 		int nFileCount = 0;
 		int nDirectoryCount = 0;
 
-		public ScanFoldersProcess(ManualResetEvent eventStop, 
+		public ScanFoldersProcess(
+			ManualResetEvent eventStop, 
 			ManualResetEvent eventStopped,
 			bool bUseCache,
 			ProgressBar progressBar,

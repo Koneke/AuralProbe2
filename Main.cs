@@ -18,7 +18,6 @@ namespace Aural_Probe
 		private StatusBar statusBar;
 		public StatusBarPanel statusBarPanel;
 
-		//public static FMOD.System systemFMOD  = null;
 		public static FMOD.Sound sound  = null;
 		private FMOD.Channel channel = null;
 		public bool bAutoPlayNextSample = false;
@@ -31,25 +30,21 @@ namespace Aural_Probe
 		public const int kVersionedSampleCacheID = 1;
 
 		public static ConfigFile configFile => app.configFile;
-		//public static FavoritesFile favoritesFile;
 		
 		public static int knMaxColors = 16;
 		public int nColorInc;
-		//static public Color[,] colorList;
 
 		public bool bUseCachedSamplesIfPossible;
 
 		public string forceLoadFavoritesName = "";
 		public int lnSamples;
 		public bool lbDontPlayNextSample;
-		public string[] sampleList => app.sampleList;
-		public int[] sampleColorIndex => app.sampleColorIndex;
-		public int[,] sampleIndices => app.sampleIndices;
-		public int[] sampleIndicesCount => app.sampleIndicesCount;
-		public int[] sampleFavoritesCount => app.sampleFavoritesCount;
-		public int[] sampleBitField => app.sampleBitField;
-
-		int bitFavorite = 0;
+		public string[] sampleList => app.Library.sampleList;
+		public int[] sampleColorIndex => app.Library.sampleColorIndex;
+		public int[,] sampleIndices => app.Library.sampleIndices;
+		public int[] sampleIndicesCount => app.Library.sampleIndicesCount;
+		public int[] sampleFavoritesCount => app.Library.sampleFavoritesCount;
+		public int[] sampleBitField => app.Library.sampleBitField;
 
 		private ToolBarButton toolBarButtonLoadFavorites;
 		private ToolBarButton toolBarButtonSaveFavorites;
@@ -66,28 +61,8 @@ namespace Aural_Probe
 		private MenuItem menuItem1;
 		private MenuItem menuItem2;
 
+		int bitFavorite = 0;
 		int bitMissing = 1;
-
-		public bool GetSampleFlag(int sample, int bit) => (sampleBitField[sample] & (1 << bit)) != 0;
-
-		public void SetSampleFlag(int sample, int bit, bool val)
-		{
-			try
-			{
-				if (val == true)
-				{
-					sampleBitField[sample] |= 1 << bit;
-				}
-				else
-				{
-					sampleBitField[sample] &= ~(1 << bit);
-				}
-			}
-			catch (System.Exception e)
-			{
-				MessageBox.Show("SetSampleFlag " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-		}
 
 		public int listSamplesSingleSelectedIndex; // when there are multiple selections, this is -1, otherwise it's listSamples.SelectedIndex
 		public int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
@@ -103,8 +78,6 @@ namespace Aural_Probe
 		public ProgressBar progressForm;
 
 		private ToolBar toolBar1;
-		private Panel panel1;
-		private Splitter splitter1;
 		public ListBox categoriesList;
 		private ToolBarButton toolBarButtonConfiguration;
 		private ToolBarButton toolBarButton;
@@ -120,7 +93,9 @@ namespace Aural_Probe
 		private IContainer components;
 		private StatusBarPanel statusBarProperties;
 		private ToolBarButton toolBarButtonFavoritesOnly;
-
+		private SplitContainer splitContainer2;
+		private SplitContainer splitContainer1;
+		public ListBox tagsList;
 		public ContextMenu sampleListMenu;  
 
 		public MainForm()
@@ -132,11 +107,10 @@ namespace Aural_Probe
 			m_windowState.Parent = this;
 			m_windowState.RegistryPath = @"Software\Aural Probe"; 
 
-			app = new App();
-
 			try
 			{
-				app.foo(this);
+				app = new App(this);
+				app.foo(this); // what the fuck why can't I just put this in the ctor of App? haha
 
 				UpdateFormWithConfigurationData();
 				Show();
@@ -158,24 +132,32 @@ namespace Aural_Probe
 				if (lnSamples == 0 && file.bLoaded)
 				{
 					if (bShowWarning)
-						MessageBox.Show("You must scan the search folders for samples before trying to load favorites.", "No samples loaded!",
-							MessageBoxButtons.OK, MessageBoxIcon.Information);
+					{
+						MessageBox.Show(
+							"You must scan the search folders for samples before trying to load favorites.",
+							"No samples loaded!",
+							MessageBoxButtons.OK,
+							MessageBoxIcon.Information);
+					}
 					file.Reset(0);
 					return false;
 				}
 
 				bool bError = false;
 				string errorMessage = "The following favorites could not be located:\n\n";
+
 				for (int i = 0; i < lnSamples; ++i)
-					SetSampleFlag(i, bitFavorite, false);
+				{
+					app.SetSampleFlag(i, bitFavorite, false);
+				}
+
 				for (int i = 0; i < file.nFavorites; ++i)
 				{
 					// See if we can quickly find favorite
-					if (file.favoriteIndex[i] < lnSamples &&
-						file.favoriteName[i] == sampleList[file.favoriteIndex[i]])
+					if (file.favoriteIndex[i] < lnSamples && file.favoriteName[i] == sampleList[file.favoriteIndex[i]])
 					{
 						// we have a winner!
-						SetSampleFlag(file.favoriteIndex[i], bitFavorite, true);
+						app.SetSampleFlag(file.favoriteIndex[i], bitFavorite, true);
 					}
 					else
 					{
@@ -186,7 +168,7 @@ namespace Aural_Probe
 							if (sampleList[j] == file.favoriteName[i])
 							{
 								// we found it!
-								SetSampleFlag(file.favoriteIndex[i], bitFavorite, true);
+								app.SetSampleFlag(file.favoriteIndex[i], bitFavorite, true);
 								break;
 							}
 						}
@@ -197,12 +179,17 @@ namespace Aural_Probe
 						}
 					}
 				}
+
 				if (bError)
 				{
 					errorMessage += "\nThese samples have either been moved to a new location or deleted.";
-					MessageBox.Show(errorMessage, "Some favorites missing!",
-						MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					MessageBox.Show(
+						errorMessage,
+						"Some favorites missing!",
+						MessageBoxButtons.OK,
+						MessageBoxIcon.Exclamation);
 				}
+
 				return true;
 			}
 			catch (System.Exception e)
@@ -219,16 +206,23 @@ namespace Aural_Probe
 				if (sampleFavoritesCount[0] == 0)
 				{
 					if (bShowWarning)
-						MessageBox.Show("There are no favorites to save.", "Nothing to save!",
-							MessageBoxButtons.OK, MessageBoxIcon.Information);
+					{
+						MessageBox.Show(
+							"There are no favorites to save.",
+							"Nothing to save!",
+							MessageBoxButtons.OK,
+							MessageBoxIcon.Information);
+					}
+
 					return;
 				}
 
 				file.Reset(sampleFavoritesCount[0]);
 				int favoriteIndex = 0;
+
 				for (int i = 0; i < lnSamples; ++i)
 				{
-					if (GetSampleFlag(i, bitFavorite))
+					if (app.GetSampleFlag(i, bitFavorite))
 					{
 						file.favoriteIndex[favoriteIndex] = i;
 						file.favoriteName[favoriteIndex] = sampleList[i];
@@ -252,7 +246,7 @@ namespace Aural_Probe
 					for (int j = 0; j < sampleIndicesCount[i]; ++j)
 					{
 						int index = sampleIndices[i,j];
-						if (GetSampleFlag(index, bitFavorite))
+						if (app.GetSampleFlag(index, bitFavorite))
 						{
 							sampleFavoritesCount[i]++;
 						}
@@ -309,7 +303,7 @@ namespace Aural_Probe
 				for (int i = 0; i < nCount; ++i)
 				{
 					int nSampleIndex = sampleIndices[nCurrentCategory, i];
-					if (!lbFavoritesOnly || GetSampleFlag(nSampleIndex, bitFavorite))
+					if (!lbFavoritesOnly || app.GetSampleFlag(nSampleIndex, bitFavorite))
 					{
 						listSamples.Items.Add(i.ToString());
 					}
@@ -374,10 +368,16 @@ namespace Aural_Probe
 		public void UpdateVolume()
 		{
 			float volumePercentage = trackBarMasterVol.Value / 100.0f;
+
 			if (volumePercentage <= 0f)
+			{
 				labelVolumeValue.Text = "Off";
+			}
 			else
+			{
 				labelVolumeValue.Text = (20f * Math.Log10(volumePercentage)).ToString("F1") + " dB";
+			}
+
 			FMOD.ChannelGroup group = null;
 			FMOD.RESULT result = app.fmodManager.systemFMOD.getMasterChannelGroup(ref group);
 			group.setVolume(volumePercentage);
@@ -589,12 +589,9 @@ namespace Aural_Probe
 			this.toolBarButtonHelp = new System.Windows.Forms.ToolBarButton();
 			this.toolBarButtonAbout = new System.Windows.Forms.ToolBarButton();
 			this.imageList1 = new System.Windows.Forms.ImageList(this.components);
-			this.panel1 = new System.Windows.Forms.Panel();
 			this.statusLabel = new System.Windows.Forms.Label();
 			this.pictureStatus = new System.Windows.Forms.PictureBox();
-			//this.listSamples = new SamplesListBox();
-			this.listSamples = new ListBox();
-			this.splitter1 = new System.Windows.Forms.Splitter();
+			this.listSamples = new System.Windows.Forms.ListBox();
 			this.categoriesList = new System.Windows.Forms.ListBox();
 			this.timer = new System.Timers.Timer();
 			this.trackBarMasterVol = new System.Windows.Forms.TrackBar();
@@ -604,12 +601,22 @@ namespace Aural_Probe
 			this.contextMenuNotify = new System.Windows.Forms.ContextMenu();
 			this.menuItem1 = new System.Windows.Forms.MenuItem();
 			this.menuItem2 = new System.Windows.Forms.MenuItem();
+			this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+			this.splitContainer2 = new System.Windows.Forms.SplitContainer();
+			this.tagsList = new System.Windows.Forms.ListBox();
 			((System.ComponentModel.ISupportInitialize)(this.statusBarPanel)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.statusBarProperties)).BeginInit();
-			this.panel1.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.pictureStatus)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.timer)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.trackBarMasterVol)).BeginInit();
+			((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
+			this.splitContainer1.Panel1.SuspendLayout();
+			this.splitContainer1.Panel2.SuspendLayout();
+			this.splitContainer1.SuspendLayout();
+			((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
+			this.splitContainer2.Panel1.SuspendLayout();
+			this.splitContainer2.Panel2.SuspendLayout();
+			this.splitContainer2.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// statusBar
@@ -617,8 +624,8 @@ namespace Aural_Probe
 			this.statusBar.Location = new System.Drawing.Point(0, 299);
 			this.statusBar.Name = "statusBar";
 			this.statusBar.Panels.AddRange(new System.Windows.Forms.StatusBarPanel[] {
-			this.statusBarPanel,
-			this.statusBarProperties});
+            this.statusBarPanel,
+            this.statusBarProperties});
 			this.statusBar.RightToLeft = System.Windows.Forms.RightToLeft.No;
 			this.statusBar.ShowPanels = true;
 			this.statusBar.Size = new System.Drawing.Size(632, 24);
@@ -630,8 +637,8 @@ namespace Aural_Probe
 			// 
 			this.statusBarPanel.AutoSize = System.Windows.Forms.StatusBarPanelAutoSize.Spring;
 			this.statusBarPanel.Name = "statusBarPanel";
+			this.statusBarPanel.Style = System.Windows.Forms.StatusBarPanelStyle.OwnerDraw;
 			this.statusBarPanel.Width = 385;
-			this.statusBarPanel.Style = StatusBarPanelStyle.OwnerDraw;
 			// 
 			// statusBarProperties
 			// 
@@ -643,19 +650,19 @@ namespace Aural_Probe
 			this.toolBar1.Appearance = System.Windows.Forms.ToolBarAppearance.Flat;
 			this.toolBar1.AutoSize = false;
 			this.toolBar1.Buttons.AddRange(new System.Windows.Forms.ToolBarButton[] {
-			this.toolBarButtonRescanFolders,
-			this.toolBarButton2,
-			this.toolBarButtonFavoritesOnly,
-			this.toolBarButtonLoadFavorites,
-			this.toolBarButtonSaveFavorites,
-			this.toolBarButtonResetFavorites,
-			this.toolBarButton,
-			this.toolBarButtonPlayStop,
-			this.toolBarButton1,
-			this.toolBarButtonConfiguration,
-			this.toolBarButton3,
-			this.toolBarButtonHelp,
-			this.toolBarButtonAbout});
+            this.toolBarButtonRescanFolders,
+            this.toolBarButton2,
+            this.toolBarButtonFavoritesOnly,
+            this.toolBarButtonLoadFavorites,
+            this.toolBarButtonSaveFavorites,
+            this.toolBarButtonResetFavorites,
+            this.toolBarButton,
+            this.toolBarButtonPlayStop,
+            this.toolBarButton1,
+            this.toolBarButtonConfiguration,
+            this.toolBarButton3,
+            this.toolBarButtonHelp,
+            this.toolBarButtonAbout});
 			this.toolBar1.ButtonSize = new System.Drawing.Size(16, 16);
 			this.toolBar1.DropDownArrows = true;
 			this.toolBar1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -766,26 +773,12 @@ namespace Aural_Probe
 			this.imageList1.Images.SetKeyName(8, "");
 			this.imageList1.Images.SetKeyName(9, "");
 			// 
-			// panel1
-			// 
-			this.panel1.Controls.Add(this.statusLabel);
-			this.panel1.Controls.Add(this.pictureStatus);
-			this.panel1.Controls.Add(this.listSamples);
-			this.panel1.Controls.Add(this.splitter1);
-			this.panel1.Controls.Add(this.categoriesList);
-			this.panel1.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.panel1.Location = new System.Drawing.Point(0, 38);
-			this.panel1.Name = "panel1";
-			this.panel1.Padding = new System.Windows.Forms.Padding(1);
-			this.panel1.Size = new System.Drawing.Size(632, 261);
-			this.panel1.TabIndex = 5;
-			// 
 			// statusLabel
 			// 
 			this.statusLabel.Anchor = System.Windows.Forms.AnchorStyles.None;
 			this.statusLabel.BackColor = System.Drawing.Color.Black;
 			this.statusLabel.ForeColor = System.Drawing.Color.Silver;
-			this.statusLabel.Location = new System.Drawing.Point(304, 176);
+			this.statusLabel.Location = new System.Drawing.Point(117, 180);
 			this.statusLabel.Name = "statusLabel";
 			this.statusLabel.Size = new System.Drawing.Size(176, 40);
 			this.statusLabel.TabIndex = 6;
@@ -797,7 +790,7 @@ namespace Aural_Probe
 			this.pictureStatus.Anchor = System.Windows.Forms.AnchorStyles.None;
 			this.pictureStatus.BackColor = System.Drawing.Color.Black;
 			this.pictureStatus.Image = ((System.Drawing.Image)(resources.GetObject("pictureStatus.Image")));
-			this.pictureStatus.Location = new System.Drawing.Point(328, 48);
+			this.pictureStatus.Location = new System.Drawing.Point(141, 49);
 			this.pictureStatus.Name = "pictureStatus";
 			this.pictureStatus.Size = new System.Drawing.Size(128, 128);
 			this.pictureStatus.TabIndex = 5;
@@ -814,36 +807,27 @@ namespace Aural_Probe
 			this.listSamples.ForeColor = System.Drawing.Color.Silver;
 			this.listSamples.IntegralHeight = false;
 			this.listSamples.ItemHeight = 32;
-			this.listSamples.Location = new System.Drawing.Point(155, 1);
+			this.listSamples.Location = new System.Drawing.Point(0, 0);
 			this.listSamples.MultiColumn = true;
 			this.listSamples.Name = "listSamples";
 			this.listSamples.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
-			this.listSamples.Size = new System.Drawing.Size(476, 259);
+			this.listSamples.Size = new System.Drawing.Size(418, 261);
 			this.listSamples.TabIndex = 1;
-			//this.listSamples.PreMouseDown += new System.EventHandler(this.listSamples_PreMouseDown);
 			this.listSamples.DrawItem += new System.Windows.Forms.DrawItemEventHandler(this.listSamples_DrawItem);
 			this.listSamples.SelectedIndexChanged += new System.EventHandler(this.listSamples_SelectedIndexChanged);
 			this.listSamples.KeyDown += new System.Windows.Forms.KeyEventHandler(this.listSamples_OnKeyDown);
 			this.listSamples.MouseMove += new System.Windows.Forms.MouseEventHandler(this.listSamples_OnMouseMove);
 			// 
-			// splitter1
-			// 
-			this.splitter1.Location = new System.Drawing.Point(151, 1);
-			this.splitter1.Name = "splitter1";
-			this.splitter1.Size = new System.Drawing.Size(4, 259);
-			this.splitter1.TabIndex = 0;
-			this.splitter1.TabStop = false;
-			// 
 			// categoriesList
 			// 
 			this.categoriesList.BackColor = System.Drawing.Color.Black;
-			this.categoriesList.Dock = System.Windows.Forms.DockStyle.Left;
+			this.categoriesList.Dock = System.Windows.Forms.DockStyle.Fill;
 			this.categoriesList.ForeColor = System.Drawing.Color.Silver;
 			this.categoriesList.ImeMode = System.Windows.Forms.ImeMode.NoControl;
 			this.categoriesList.IntegralHeight = false;
-			this.categoriesList.Location = new System.Drawing.Point(1, 1);
+			this.categoriesList.Location = new System.Drawing.Point(0, 0);
 			this.categoriesList.Name = "categoriesList";
-			this.categoriesList.Size = new System.Drawing.Size(150, 259);
+			this.categoriesList.Size = new System.Drawing.Size(210, 130);
 			this.categoriesList.TabIndex = 0;
 			this.categoriesList.SelectedIndexChanged += new System.EventHandler(this.categoriesList_SelectedIndexChanged);
 			// 
@@ -900,8 +884,8 @@ namespace Aural_Probe
 			// contextMenuNotify
 			// 
 			this.contextMenuNotify.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
-			this.menuItem1,
-			this.menuItem2});
+            this.menuItem1,
+            this.menuItem2});
 			this.contextMenuNotify.Popup += new System.EventHandler(this.contextMenuNotify_Popup);
 			// 
 			// menuItem1
@@ -917,6 +901,55 @@ namespace Aural_Probe
 			this.menuItem2.Text = "Exit";
 			this.menuItem2.Click += new System.EventHandler(this.menuItem2_Click);
 			// 
+			// splitContainer1
+			// 
+			this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
+			this.splitContainer1.Location = new System.Drawing.Point(0, 0);
+			this.splitContainer1.Name = "splitContainer1";
+			this.splitContainer1.Orientation = System.Windows.Forms.Orientation.Horizontal;
+			// 
+			// splitContainer1.Panel1
+			// 
+			this.splitContainer1.Panel1.Controls.Add(this.categoriesList);
+			// 
+			// splitContainer1.Panel2
+			// 
+			this.splitContainer1.Panel2.Controls.Add(this.tagsList);
+			this.splitContainer1.Size = new System.Drawing.Size(210, 261);
+			this.splitContainer1.SplitterDistance = 130;
+			this.splitContainer1.TabIndex = 7;
+			// 
+			// splitContainer2
+			// 
+			this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
+			this.splitContainer2.Location = new System.Drawing.Point(0, 38);
+			this.splitContainer2.Name = "splitContainer2";
+			// 
+			// splitContainer2.Panel1
+			// 
+			this.splitContainer2.Panel1.Controls.Add(this.splitContainer1);
+			// 
+			// splitContainer2.Panel2
+			// 
+			this.splitContainer2.Panel2.Controls.Add(this.statusLabel);
+			this.splitContainer2.Panel2.Controls.Add(this.pictureStatus);
+			this.splitContainer2.Panel2.Controls.Add(this.listSamples);
+			this.splitContainer2.Size = new System.Drawing.Size(632, 261);
+			this.splitContainer2.SplitterDistance = 210;
+			this.splitContainer2.TabIndex = 10;
+			// 
+			// tagsList
+			// 
+			this.tagsList.BackColor = System.Drawing.Color.Black;
+			this.tagsList.Dock = System.Windows.Forms.DockStyle.Fill;
+			this.tagsList.ForeColor = System.Drawing.Color.Silver;
+			this.tagsList.ImeMode = System.Windows.Forms.ImeMode.NoControl;
+			this.tagsList.IntegralHeight = false;
+			this.tagsList.Location = new System.Drawing.Point(0, 0);
+			this.tagsList.Name = "tagsList";
+			this.tagsList.Size = new System.Drawing.Size(210, 127);
+			this.tagsList.TabIndex = 1;
+			// 
 			// MainForm
 			// 
 			this.AutoScaleBaseSize = new System.Drawing.Size(5, 13);
@@ -924,7 +957,7 @@ namespace Aural_Probe
 			this.Controls.Add(this.labelVolumeValue);
 			this.Controls.Add(this.trackBarMasterVol);
 			this.Controls.Add(this.labelVolume);
-			this.Controls.Add(this.panel1);
+			this.Controls.Add(this.splitContainer2);
 			this.Controls.Add(this.toolBar1);
 			this.Controls.Add(this.statusBar);
 			this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
@@ -935,10 +968,17 @@ namespace Aural_Probe
 			this.Resize += new System.EventHandler(this.MainForm_Resize);
 			((System.ComponentModel.ISupportInitialize)(this.statusBarPanel)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.statusBarProperties)).EndInit();
-			this.panel1.ResumeLayout(false);
 			((System.ComponentModel.ISupportInitialize)(this.pictureStatus)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.timer)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.trackBarMasterVol)).EndInit();
+			this.splitContainer1.Panel1.ResumeLayout(false);
+			this.splitContainer1.Panel2.ResumeLayout(false);
+			((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
+			this.splitContainer1.ResumeLayout(false);
+			this.splitContainer2.Panel1.ResumeLayout(false);
+			this.splitContainer2.Panel2.ResumeLayout(false);
+			((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
+			this.splitContainer2.ResumeLayout(false);
 			this.ResumeLayout(false);
 
 		}
@@ -1246,9 +1286,13 @@ namespace Aural_Probe
 		private void UpdateListSamplesSingleSelectedIndex()
 		{
 			if (listSamples.SelectedIndices.Count == 1)
+			{
 				listSamplesSingleSelectedIndex = listSamples.SelectedIndices[0];
+			}
 			else
+			{
 				listSamplesSingleSelectedIndex = -1; // don't allow an active singular selection if multiple items are selected
+			}
 		}
 
 		public void listSamplesSelectedIndexChanged()
@@ -1261,17 +1305,23 @@ namespace Aural_Probe
 				if (listSamplesLastSelectedIndices != null)
 				{
 					for (int i = 0; i < listSamplesLastSelectedIndices.Length; ++i)
+					{
 						listSamples.Invalidate(listSamples.GetItemRectangle(listSamplesLastSelectedIndices[i]));
+					}
 				}
 
 				// Copy current list sample indices to last list sample indices
 				listSamplesLastSelectedIndices = new int[listSamples.SelectedIndices.Count];
 				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
+				{
 					listSamplesLastSelectedIndices[i] = listSamples.SelectedIndices[i];
+				}
 
 				// Invalidate current list sample indices
 				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
+				{
 					listSamples.Invalidate(listSamples.GetItemRectangle(listSamples.SelectedIndices[i]));
+				}
 
 				// Update popup context menu and default Favorites checkbox state
 				listSamples.ContextMenu = listSamples.SelectedIndices.Count > 0 ? sampleListMenu : null;
@@ -1293,7 +1343,7 @@ namespace Aural_Probe
 
 				// update favorites checkbox state in popup menu if applicable
 				if (listSamplesSingleSelectedIndex != -1)
-					sampleListMenu.MenuItems[3].Checked = GetSampleFlag(nSampleIndex, bitFavorite);
+					sampleListMenu.MenuItems[3].Checked = app.GetSampleFlag(nSampleIndex, bitFavorite);
 
 				string sampleName = sampleList[nSampleIndex];
 
@@ -1301,15 +1351,17 @@ namespace Aural_Probe
 				statusBarPanel.ToolTipText = sampleName;
 
 				bool sampleFileExists = File.Exists(sampleName);
-				SetSampleFlag(nSampleIndex, bitMissing, !sampleFileExists);
+				app.SetSampleFlag(nSampleIndex, bitMissing, !sampleFileExists);
 				if (!sampleFileExists)
 					return;
 
 				try
 				{
-					FMOD.RESULT	 result;
+					FMOD.RESULT result;
 					if (channel != null)
+					{
 						channel.stop();
+					}
 
 					if (sound != null)
 					{
@@ -1336,7 +1388,10 @@ namespace Aural_Probe
 							fmodUtils.ERRCHECK(result);
 
 							if (channel != null)
+							{
 								channel.setCallback(cbFMOD);
+							}
+
 							toolBarButtonPlayStop.Enabled = listSamplesSingleSelectedIndex != -1;
 							toolBarButtonPlayStop.Text = "Stop";
 							toolBarButtonPlayStop.ImageIndex = 8;
@@ -1351,14 +1406,17 @@ namespace Aural_Probe
 						float pan = 0;
 						int pri = 0;
 						uint length = 0;
+
 						result = sound.getFormat(ref stype, ref sformat, ref schannels, ref sbits);
 						fmodUtils.ERRCHECK(result);
+
 						result = sound.getDefaults(ref freq, ref vol, ref pan, ref pri);
 						fmodUtils.ERRCHECK(result);
+
 						result = sound.getLength(ref length, FMOD.TIMEUNIT.MS);
 						fmodUtils.ERRCHECK(result);
-						string lengthstr;
-						lengthstr = (length / (float)1000).ToString() + "s";
+
+						string lengthstr = (length / (float)1000).ToString() + "s";
 						statusBarProperties.Text =
 							(freq / 1000).ToString() + "KHz " +
 							sbits.ToString() + "-bit " +
@@ -1368,7 +1426,7 @@ namespace Aural_Probe
 					}
 					else
 					{
-						SetSampleFlag(nSampleIndex, bitMissing, true);
+						app.SetSampleFlag(nSampleIndex, bitMissing, true);
 						listSamples.Invalidate(listSamples.GetItemRectangle(listSamplesSingleSelectedIndex));
 						
 						statusBarPanel.Text = sampleName;
@@ -1416,14 +1474,16 @@ namespace Aural_Probe
 				{
 					color = app.colorList[sampleColorIndex[sampleIndex],0];
 				}
-				if (GetSampleFlag(sampleIndex, bitMissing))
+
+				if (app.GetSampleFlag(sampleIndex, bitMissing))
+				{
 					color = Color.Red;
+				}
 
 				SolidBrush brush = new SolidBrush(color);
 				Pen favoritePen = new Pen(Color.White, 3);
 
 				Brush textBrush = Brushes.Black;
-				//Pen pen = new Pen(Color.Silver);
 				int nBorder = 2;
 				Rectangle boundedText;
 				boundedText = e.Bounds;
@@ -1431,19 +1491,18 @@ namespace Aural_Probe
 				boundedText.Y += nBorder * 2;
 				boundedText.Width -= nBorder * 4;
 				boundedText.Height -= nBorder * 4;
-				//e.Graphics.DrawRectangle(pen, e.Bounds.X + nBorder, e.Bounds.Y + nBorder, e.Bounds.Width - (nBorder * 2) - 1, e.Bounds.Height - (nBorder * 2) - 1);
 				e.Graphics.FillRectangle(brush, e.Bounds.X + nBorder, e.Bounds.Y + nBorder, e.Bounds.Width - (nBorder * 2), e.Bounds.Height - (nBorder * 2));
-				if (GetSampleFlag(sampleIndex, bitFavorite))
+
+				if (app.GetSampleFlag(sampleIndex, bitFavorite))
+				{
 					e.Graphics.DrawRectangle(favoritePen, e.Bounds.X + nBorder, e.Bounds.Y + nBorder, e.Bounds.Width - (nBorder * 2), e.Bounds.Height - (nBorder * 2));
+				}
 
 				string sampleName = sampleList[sampleIndex];
 				string[] split = sampleName.Split('\\');
 				string name = split[split.Length - 1];
 
 				e.Graphics.DrawString(name, e.Font, textBrush, boundedText,StringFormat.GenericDefault);
-				//e.Graphics.DrawImage(imageList1.Images[0], e.Bounds.X, e.Bounds.Y, 32, 32);
-				// If the ListBox has focus, draw a focus rectangle around the selected item.
-				//e.DrawFocusRectangle();
 			}
 			catch (System.Exception ex)
 			{
@@ -1490,7 +1549,7 @@ namespace Aural_Probe
 					for (int i = 0; i < sampleIndicesCount[nCurrentCategory]; ++i)
 					{
 						int nSampleIndex = sampleIndices[nCurrentCategory, i];
-						if (GetSampleFlag(nSampleIndex, bitFavorite))
+						if (app.GetSampleFlag(nSampleIndex, bitFavorite))
 						{
 							if (nFavoriteCount == listBoxIndex)
 								return i;
@@ -1503,7 +1562,7 @@ namespace Aural_Probe
 			{
 				MessageBox.Show("CalculateRealSampleIndex " + listBoxIndex + " " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
-			return -1;				
+			return -1;
 		}
 
 		private void SystemEvents_SessionEnding(object sender, SessionEndingEventArgs e) 

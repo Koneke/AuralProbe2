@@ -1,50 +1,17 @@
 ﻿using System;
 using System.Drawing;
-using System.ComponentModel;
 using System.Windows.Forms;
 using System.IO;
-using System.Text;
-using System.Runtime.Serialization.Formatters.Binary;
 using Microsoft.Win32;
 
 namespace Aural_Probe
 {
-	class ColorUtils
-	{
-		public static void HSVtoRGB(ref float H, ref float S, ref float V, ref float R, ref float G, ref float B)
-		{
-			try
-			{
-				// Build color list from HSV values
-				int Hi = ((int)(H / 60.0f)) % 6;
-				float f = (H / 60.0f) - Hi;
-				float p = V * (1.0f - S);
-				float q = V * (1.0f - (f * S));
-				float t = V * (1.0f - ((1.0f - f) * S));
-				if (Hi == 0) { R = V; G = t; B = p; }
-				else if (Hi == 1) { R = q; G = V; B = p; }
-				else if (Hi == 2) { R = p; G = V; B = t; }
-				else if (Hi == 3) { R = p; G = q; B = V; }
-				else if (Hi == 4) { R = t; G = p; B = V; }
-				else if (Hi == 5) { R = V; G = p; B = q; }
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("HSVtoRGB " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-		}
-	}
-
 	public class App
 	{
 		public FmodManager fmodManager;
 		public FMOD.CHANNEL_CALLBACK cbFMOD = null;
 
 		private MainForm mainForm;
-		/*private ConfigurationForm configurationForm;
-		private AboutForm aboutForm;
-		private ProgressBar progressForm;
-		private ContextMenu sampleListMenu;*/
 
 		public string workingDirectory;
 		public ConfigFile configFile;
@@ -57,12 +24,7 @@ namespace Aural_Probe
 		private int bitFavorite = 0;
 		private int bitMissing = 1;
 
-		public string[] sampleList;
-		public int[] sampleColorIndex;
-		public int[,] sampleIndices;
-		public int[] sampleIndicesCount;
-		public int[] sampleFavoritesCount;
-		public int[] sampleBitField;
+		public Library Library;
 
 		public int listSamplesSingleSelectedIndex; // when there are multiple selections, this is -1, otherwise it's listSamples.SelectedIndex
 		public int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
@@ -71,14 +33,19 @@ namespace Aural_Probe
 		public int nColorInc;
 		public Color[,] colorList;
 
+		public App(MainForm mainForm)
+		{
+			this.Library = new Library();
+		}
+
 		public void AllocateSampleData(int nSize)
 		{
 			try
 			{
-				sampleList = new string[nSize];
-				sampleColorIndex = new int[nSize];
-				sampleBitField = new int[nSize];
-				sampleIndices = new int[configFile.kMaxCategories,nSize];
+				Library.sampleList = new string[nSize];
+				Library.sampleColorIndex = new int[nSize];
+				Library.sampleBitField = new int[nSize];
+				Library.sampleIndices = new int[configFile.kMaxCategories,nSize];
 			}
 			catch (System.Exception ex)
 			{
@@ -119,8 +86,8 @@ namespace Aural_Probe
 				colorList[i, 1] = Color.FromArgb((int)(R * 255.0f), (int)(G * 255.0f), (int)(B * 255.0f));
 			}
 
-			sampleIndicesCount = new int[configFile.kMaxCategories];
-			sampleFavoritesCount = new int[configFile.kMaxCategories];
+			Library.sampleIndicesCount = new int[configFile.kMaxCategories];
+			Library.sampleFavoritesCount = new int[configFile.kMaxCategories];
 
 			lbFavoritesOnly = false;
 
@@ -187,7 +154,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				return configFile.categoryName[i] + " (" + (lbFavoritesOnly ? sampleFavoritesCount[i] : sampleIndicesCount[i]).ToString() + ")";
+				return configFile.categoryName[i] + " (" + (lbFavoritesOnly ? Library.sampleFavoritesCount[i] : Library.sampleIndicesCount[i]).ToString() + ")";
 			}
 			catch (System.Exception e)
 			{
@@ -196,7 +163,7 @@ namespace Aural_Probe
 			}
 		}
 
-		public bool GetSampleFlag(int sample, int bit) => (sampleBitField[sample] & (1 << bit)) != 0;
+		public bool GetSampleFlag(int sample, int bit) => (Library.sampleBitField[sample] & (1 << bit)) != 0;
 
 		public void SetSampleFlag(int sample, int bit, bool val)
 		{
@@ -204,11 +171,11 @@ namespace Aural_Probe
 			{
 				if (val == true)
 				{
-					sampleBitField[sample] |= 1 << bit;
+					Library.sampleBitField[sample] |= 1 << bit;
 				}
 				else
 				{
-					sampleBitField[sample] &= ~(1 << bit);
+					Library.sampleBitField[sample] &= ~(1 << bit);
 				}
 			}
 			catch (System.Exception e)
@@ -222,20 +189,22 @@ namespace Aural_Probe
 			try
 			{
 				if (!lbFavoritesOnly)
+				{
 					return listBoxIndex;
+				}
 				else
 				{
 					int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
 
-					if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+					if (nCurrentCategory < 0 || Library.sampleIndicesCount[nCurrentCategory] == 0)
 					{
 						return -1;
 					}
 
 					int nFavoriteCount = 0;
-					for (int i = 0; i < sampleIndicesCount[nCurrentCategory]; ++i)
+					for (int i = 0; i < Library.sampleIndicesCount[nCurrentCategory]; ++i)
 					{
-						int nSampleIndex = sampleIndices[nCurrentCategory, i];
+						int nSampleIndex = Library.sampleIndices[nCurrentCategory, i];
 						if (GetSampleFlag(nSampleIndex, bitFavorite))
 						{
 							if (nFavoriteCount == listBoxIndex)
@@ -259,7 +228,7 @@ namespace Aural_Probe
 				fmodManager.StopSoundPlayback();
 
 				int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0) return;
+				if (nCurrentCategory < 0 || Library.sampleIndicesCount[nCurrentCategory] == 0) return;
 				if (mainForm.listSamples.SelectedIndices.Count == 0) return;
 				if (
 					mainForm.listSamples.SelectedIndices.Count > 1 &&
@@ -275,7 +244,7 @@ namespace Aural_Probe
 					int nCurrentSample = mainForm.CalculateRealSampleIndex(mainForm.listSamples.SelectedIndices[i]);
 					if (nCurrentSample < 0) continue;
 
-					string sampleName = mainForm.sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
+					string sampleName = mainForm.sampleList[Library.sampleIndices[nCurrentCategory, nCurrentSample]];
 					System.Diagnostics.Process proc = new System.Diagnostics.Process();
 					proc.EnableRaisingEvents = false;
 					proc.StartInfo.FileName = "explorer";
@@ -294,7 +263,7 @@ namespace Aural_Probe
 			try
 			{
 				int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+				if (nCurrentCategory < 0 || Library.sampleIndicesCount[nCurrentCategory] == 0)
 					return;
 				if (mainForm.listSamples.SelectedIndices.Count == 0)
 					return;
@@ -305,7 +274,7 @@ namespace Aural_Probe
 					int nCurrentSample = CalculateRealSampleIndex(mainForm.listSamples.SelectedIndices[i]);
 					if (nCurrentSample < 0)
 						continue;
-					filename[i] = mainForm.sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
+					filename[i] = mainForm.sampleList[Library.sampleIndices[nCurrentCategory, nCurrentSample]];
 				}
 				objData.SetData(DataFormats.FileDrop, true, filename);  
 				Clipboard.SetDataObject(objData, true);  
@@ -323,7 +292,7 @@ namespace Aural_Probe
 			try
 			{
 				int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+				if (nCurrentCategory < 0 || Library.sampleIndicesCount[nCurrentCategory] == 0)
 					return;
 				if (mainForm.listSamples.SelectedIndices.Count == 0)
 					return;
@@ -333,7 +302,7 @@ namespace Aural_Probe
 					int nCurrentSample = CalculateRealSampleIndex(mainForm.listSamples.SelectedIndices[i]);
 					if (nCurrentSample < 0)
 						continue;
-					sampleNames += mainForm.sampleList[sampleIndices[nCurrentCategory, nCurrentSample]] + "\r\n";
+					sampleNames += mainForm.sampleList[Library.sampleIndices[nCurrentCategory, nCurrentSample]] + "\r\n";
 				}
 				Clipboard.SetDataObject(sampleNames,true);
 				mainForm.statusBarPanel.Text = "Copied file path(s) to clipboard.";
@@ -350,7 +319,7 @@ namespace Aural_Probe
 			try
 			{
 				int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+				if (nCurrentCategory < 0 || Library.sampleIndicesCount[nCurrentCategory] == 0)
 					return;
 				if (mainForm.listSamples.SelectedIndices.Count == 0)
 					return;
@@ -358,7 +327,7 @@ namespace Aural_Probe
 				int nFavoriteSample = CalculateRealSampleIndex(mainForm.listSamples.SelectedIndices[0]);
 				if (nFavoriteSample < 0)
 					return;
-				int favoriteSampleIndex = sampleIndices[nCurrentCategory, nFavoriteSample];
+				int favoriteSampleIndex = Library.sampleIndices[nCurrentCategory, nFavoriteSample];
 				bool isFavorite = GetSampleFlag(favoriteSampleIndex, bitFavorite);
 
 				for (int i = 0; i < mainForm.listSamples.SelectedIndices.Count; ++i)
@@ -366,7 +335,7 @@ namespace Aural_Probe
 					int nCurrentSample = CalculateRealSampleIndex(mainForm.listSamples.SelectedIndices[i]);
 					if (nCurrentSample < 0)
 						continue;
-					int sampleIndex = sampleIndices[nCurrentCategory, nCurrentSample];
+					int sampleIndex = Library.sampleIndices[nCurrentCategory, nCurrentSample];
 					SetSampleFlag(sampleIndex, bitFavorite, !isFavorite);
 
 					lbDirtyFavorites = true;
@@ -389,7 +358,7 @@ namespace Aural_Probe
 					int nCurrentSample = CalculateRealSampleIndex(listSamplesSingleSelectedIndex);
 					if (nCurrentSample >= 0)
 					{
-						int sampleIndex = sampleIndices[nCurrentCategory, nCurrentSample];
+						int sampleIndex = Library.sampleIndices[nCurrentCategory, nCurrentSample];
 						mainForm.sampleListMenu.MenuItems[3].Checked = GetSampleFlag(sampleIndex, bitFavorite);
 					}
 				}
@@ -407,7 +376,7 @@ namespace Aural_Probe
 			try
 			{
 				int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0) return;
+				if (nCurrentCategory < 0 || Library.sampleIndicesCount[nCurrentCategory] == 0) return;
 				if (mainForm.listSamples.SelectedIndices.Count == 0) return;
 				else if (mainForm.listSamples.SelectedIndices.Count == 1)
 				{
@@ -435,7 +404,7 @@ namespace Aural_Probe
 				{
 					int nCurrentSample = CalculateRealSampleIndex(mainForm.listSamples.SelectedIndices[i]);
 					if (nCurrentSample < 0) continue;
-					string sampleName = mainForm.sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
+					string sampleName = mainForm.sampleList[Library.sampleIndices[nCurrentCategory, nCurrentSample]];
 					try
 					{
 						File.Delete(sampleName);
@@ -461,7 +430,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!lbDirtyFavorites || sampleFavoritesCount[0] == 0)
+				if (!lbDirtyFavorites || Library.sampleFavoritesCount[0] == 0)
 				{
 					return;
 				}
@@ -492,7 +461,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!lbDirtyFavorites || sampleFavoritesCount[0] == 0) return;
+				if (!lbDirtyFavorites || Library.sampleFavoritesCount[0] == 0) return;
 
 				// User is trying to log out. Prompt the user with choices
 				var dr = MessageBox.Show(
