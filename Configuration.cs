@@ -88,20 +88,20 @@ namespace Aural_Probe
 			int nCurrentDriver = 0;
 			int numDrivers = 0;
 			StringBuilder driverName = new StringBuilder(256);
-			result = MainForm.app.systemFMOD.getDriver(ref nCurrentDriver);
-			fmodutils.ERRCHECK(result);
+			result = MainForm.app.fmodManager.systemFMOD.getDriver(ref nCurrentDriver);
+			fmodUtils.ERRCHECK(result);
 			
 			// hack to select primary sound device - will this work???
 			if (nCurrentDriver == -1)
 				nCurrentDriver = 0;
 
-			result = MainForm.app.systemFMOD.getNumDrivers(ref numDrivers);
-			fmodutils.ERRCHECK(result);
+			result = MainForm.app.fmodManager.systemFMOD.getNumDrivers(ref numDrivers);
+			fmodUtils.ERRCHECK(result);
 			for (int count = 0; count < numDrivers; count++)
 			{
 				FMOD.GUID guid = new FMOD.GUID();
-				result = MainForm.app.systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
-				fmodutils.ERRCHECK(result);
+				result = MainForm.app.fmodManager.systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
+				fmodUtils.ERRCHECK(result);
 				comboOutputDevice.Items.Add(driverName.ToString());
 			}
 			comboOutputDevice.SelectedIndex = nCurrentDriver;
@@ -119,10 +119,10 @@ namespace Aural_Probe
 					MainForm.sound.release();
 				MainForm.sound = null;
 
-				MainForm.app.systemFMOD.close();
-				MainForm.app.systemFMOD.setDriver(nSelectedOutputDevice);
-				FMOD.RESULT result = MainForm.app.systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
-				fmodutils.ERRCHECK(result);
+				MainForm.app.fmodManager.systemFMOD.close();
+				MainForm.app.fmodManager.systemFMOD.setDriver(nSelectedOutputDevice);
+				FMOD.RESULT result = MainForm.app.fmodManager.systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
+				fmodUtils.ERRCHECK(result);
 			}
 		}
 

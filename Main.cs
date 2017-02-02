@@ -21,7 +21,6 @@ namespace Aural_Probe
 		//public static FMOD.System systemFMOD  = null;
 		public static FMOD.Sound sound  = null;
 		private FMOD.Channel channel = null;
-		private bool bFMODInitialised = false;
 		public bool bAutoPlayNextSample = false;
 		public int nAutoPlayRepeatsLeft = 0;
 		private FMOD.CHANNEL_CALLBACK cbFMOD = null;
@@ -152,26 +151,6 @@ namespace Aural_Probe
 			return;
 		}
 
-		private void TrySettingOutputDevice()
-		{
-			int numDrivers = 0;
-			StringBuilder driverName = new StringBuilder(256);
-			FMOD.RESULT result;
-			result = app.systemFMOD.getNumDrivers(ref numDrivers);
-			fmodutils.ERRCHECK(result);
-			for (int count = 0; count < numDrivers; count++)
-			{
-				FMOD.GUID guid = new FMOD.GUID();
-				result = app.systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
-				fmodutils.ERRCHECK(result);
-				if (driverName.ToString() == configFile.defaultSoundDevice)
-				{
-					result = app.systemFMOD.setDriver(count);
-					fmodutils.ERRCHECK(result);
-				}
-			}
-		}
-
 		private bool UpdateFavoriteDataFromFavoritesFile(ref FavoritesFile file, bool bShowWarning)
 		{
 			try
@@ -260,194 +239,6 @@ namespace Aural_Probe
 			catch (System.Exception e)
 			{
 				MessageBox.Show("UpdateFavoritesFileFromFavoriteData " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
-			}
-		}
-
-		private void ExploreSamples(object sender, EventArgs e)
-		{
-			try
-			{
-				StopSoundPlayback();
-
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
-					return;
-				if (listSamples.SelectedIndices.Count == 0)
-					return;
-				if (listSamples.SelectedIndices.Count > 1 && DialogResult.No == MessageBox.Show("Are you sure you want to open " + listSamples.SelectedIndices.Count.ToString() + " explorer windows?", "Explore multiple samples?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
-					return;
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
-				{
-					int nCurrentSample = CalculateRealSampleIndex(listSamples.SelectedIndices[i]);
-					if (nCurrentSample < 0)
-						continue;
-					string sampleName = sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
-					System.Diagnostics.Process proc = new System.Diagnostics.Process();
-					proc.EnableRaisingEvents = false;
-					proc.StartInfo.FileName = "explorer";
-					proc.StartInfo.Arguments = "/n,/select," + sampleName;
-					proc.Start();
-				}
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("ExploreSamples " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-		}
-
-		private void DeleteSamples(object sender, EventArgs e)
-		{
-			StopSoundPlayback();
-
-			try
-			{
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
-					return;
-				if (listSamples.SelectedIndices.Count == 0)
-					return;
-				else if (listSamples.SelectedIndices.Count == 1)
-				{
-					if (DialogResult.No == MessageBox.Show("Are you sure you want to permanently delete this sample from your computer? Deleted samples will remain in the samples list until you rescan search folders.", "Delete sample?", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2))
-						return;
-				}
-				else if (listSamples.SelectedIndices.Count > 1)
-				{
-					if (DialogResult.No == MessageBox.Show("Are you sure you want to permanently delete " + listSamples.SelectedIndices.Count.ToString() + " samples from your computer? Deleted samples will remain in the samples list until you rescan search folders.", "Delete multiple samples?", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2))
-						return;
-				}
-				string deleteErrors = "";
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
-				{
-					int nCurrentSample = CalculateRealSampleIndex(listSamples.SelectedIndices[i]);
-					if (nCurrentSample < 0)
-						continue;
-					string sampleName = sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
-					try
-					{
-						File.Delete(sampleName);
-						SetSampleFlag(nCurrentSample, bitMissing, true);
-						listSamples.Invalidate(listSamples.GetItemRectangle(listSamples.SelectedIndices[i]));
-					}
-					catch (System.Exception ex)
-					{
-						deleteErrors += ex.Message.ToString() + "\n";
-					}
-				}
-
-				if (deleteErrors != "")
-					MessageBox.Show("One or more errors were encountered during delete:\n" + deleteErrors, "Delete operation completed with errors", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("DeleteSamples " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-		}
-		
-		private void CopySamples(object sender, EventArgs e)
-		{
-			try
-			{
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
-					return;
-				if (listSamples.SelectedIndices.Count == 0)
-					return;
-				DataObject objData = new DataObject();
-				string[] filename = new string[listSamples.SelectedIndices.Count];
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
-				{
-					int nCurrentSample = CalculateRealSampleIndex(listSamples.SelectedIndices[i]);
-					if (nCurrentSample < 0)
-						continue;
-					filename[i] = sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
-				}
-				objData.SetData(DataFormats.FileDrop, true, filename);  
-				Clipboard.SetDataObject(objData, true);  
-				statusBarPanel.Text = "Copied file(s) to clipboard.";
-				statusBarPanel.ToolTipText = "";
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("CopySamples " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
-			}
-		}
-
-		private void CopySamplesShortcut(object sender, EventArgs e)
-		{
-			try
-			{
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
-					return;
-				if (listSamples.SelectedIndices.Count == 0)
-					return;
-				string sampleNames = "";
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
-				{
-					int nCurrentSample = CalculateRealSampleIndex(listSamples.SelectedIndices[i]);
-					if (nCurrentSample < 0)
-						continue;
-					sampleNames += sampleList[sampleIndices[nCurrentCategory, nCurrentSample]] + "\r\n";
-				}
-				Clipboard.SetDataObject(sampleNames,true);
-				statusBarPanel.Text = "Copied file path(s) to clipboard.";
-				statusBarPanel.ToolTipText = "";
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("CopySamplesShortcut " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
-			}
-		}
-
-		private void AddRemoveFromFavorites(object sender, EventArgs e)
-		{
-			try
-			{
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
-					return;
-				if (listSamples.SelectedIndices.Count == 0)
-					return;
-
-				int nFavoriteSample = CalculateRealSampleIndex(listSamples.SelectedIndices[0]);
-				if (nFavoriteSample < 0)
-					return;
-				int favoriteSampleIndex = sampleIndices[nCurrentCategory, nFavoriteSample];
-				bool isFavorite = GetSampleFlag(favoriteSampleIndex, bitFavorite);
-
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
-				{
-					int nCurrentSample = CalculateRealSampleIndex(listSamples.SelectedIndices[i]);
-					if (nCurrentSample < 0)
-						continue;
-					int sampleIndex = sampleIndices[nCurrentCategory, nCurrentSample];
-					SetSampleFlag(sampleIndex, bitFavorite, !isFavorite);
-
-					lbDirtyFavorites = true;
-				}
-				UpdateSampleFavorites();
-				if (lbFavoritesOnly)
-					UpdateAudioSamples();
-				else
-				{
-					for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
-						listSamples.Invalidate(listSamples.GetItemRectangle(listSamples.SelectedIndices[i]));
-				}
-				// update favorites checkbox state in popup menu
-				if (listSamplesSingleSelectedIndex != -1)
-				{
-					int nCurrentSample = CalculateRealSampleIndex(listSamplesSingleSelectedIndex);
-					if (nCurrentSample >= 0)
-					{
-						int sampleIndex = sampleIndices[nCurrentCategory, nCurrentSample];
-						sampleListMenu.MenuItems[3].Checked = GetSampleFlag(sampleIndex, bitFavorite);
-					}
-				}
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("AddRemoveFromFavorites " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
 		}
 
@@ -586,9 +377,9 @@ namespace Aural_Probe
 			if (volumePercentage <= 0f)
 				labelVolumeValue.Text = "Off";
 			else
-				labelVolumeValue.Text = (20f*Math.Log10(volumePercentage)).ToString("F1") + " dB";
+				labelVolumeValue.Text = (20f * Math.Log10(volumePercentage)).ToString("F1") + " dB";
 			FMOD.ChannelGroup group = null;
-			FMOD.RESULT result = app.systemFMOD.getMasterChannelGroup(ref group);
+			FMOD.RESULT result = app.fmodManager.systemFMOD.getMasterChannelGroup(ref group);
 			group.setVolume(volumePercentage);
 
 		}
@@ -1179,7 +970,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				StopSoundPlayback();
+				app.fmodManager.StopSoundPlayback();
 
 				FavoritesFile tempFavorites = new FavoritesFile();
 				if (lnSamples > 0 && sampleFavoritesCount[0] > 0)
@@ -1268,27 +1059,6 @@ namespace Aural_Probe
 			return false;
 		}
 
-		private void StopSoundPlayback()
-		{
-			if (channel != null)
-			{
-				bool bPlaying = false;
-				channel.isPlaying(ref bPlaying);
-				if (bPlaying)
-				{
-					channel.stop();
-					bAutoPlayNextSample = false;
-				}
-			}
-			if (sound != null)
-			{
-				FMOD.RESULT result;
-				result = sound.release();
-				fmodutils.ERRCHECK(result);
-				sound = null;
-			}
-		}
-
 		private void toolBar1_ButtonClick(object sender, System.Windows.Forms.ToolBarButtonClickEventArgs e)
 		{
 			try
@@ -1320,7 +1090,7 @@ namespace Aural_Probe
 				}
 				else if (e.Button == toolBarButtonFavoritesOnly )
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					lbFavoritesOnly = !lbFavoritesOnly;
 					UpdateFormWithConfigurationData();
@@ -1332,7 +1102,7 @@ namespace Aural_Probe
 				}
 				else if (e.Button == toolBarButtonResetFavorites )
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					if (sampleFavoritesCount[0] > 0 && 
 						DialogResult.Yes == MessageBox.Show("Are you sure you want to reset the favorites?", "Reset favorites?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
@@ -1344,9 +1114,9 @@ namespace Aural_Probe
 						UpdateAudioSamples();
 					}
 				}
-				else if (e.Button == toolBarButtonLoadFavorites )
+				else if (e.Button == toolBarButtonLoadFavorites)
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					if ((sampleFavoritesCount[0] == 0 || !lbDirtyFavorites) || DialogResult.Yes == MessageBox.Show(
 						"You will lose all changes made to the current favorites. Are you sure?",
@@ -1372,7 +1142,7 @@ namespace Aural_Probe
 				}
 				else if (e.Button == toolBarButtonSaveFavorites )
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					if (sampleFavoritesCount[0] == 0)
 					{
@@ -1385,7 +1155,7 @@ namespace Aural_Probe
 				}
 				else if (e.Button == toolBarButtonConfiguration )
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					DialogResult result = configurationForm.ShowDialog(this);
 					if (result == DialogResult.Retry)
@@ -1407,7 +1177,7 @@ namespace Aural_Probe
 				}
 				else if ( e.Button == toolBarButtonHelp )
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					try
 					{
@@ -1421,7 +1191,7 @@ namespace Aural_Probe
 				}
 				else if ( e.Button == toolBarButtonAbout )
 				{
-					StopSoundPlayback();
+					app.fmodManager.StopSoundPlayback();
 
 					aboutForm.ShowDialog();
 				}
@@ -1544,26 +1314,26 @@ namespace Aural_Probe
 					if (sound != null)
 					{
 						result = sound.release();
-						fmodutils.ERRCHECK(result);
+						fmodUtils.ERRCHECK(result);
 						sound = null;
 					}
 
-					result = app.systemFMOD.createSound(sampleName, FMOD.MODE.SOFTWARE | FMOD.MODE.CREATESTREAM, ref sound);
-					fmodutils.ERRCHECK(result);
+					result = app.fmodManager.systemFMOD.createSound(sampleName, FMOD.MODE.SOFTWARE | FMOD.MODE.CREATESTREAM, ref sound);
+					fmodUtils.ERRCHECK(result);
 					bool createSoundSucceeded = result == FMOD.RESULT.OK;
 
 					if (createSoundSucceeded)
 					{
 						result = sound.setMode(FMOD.MODE.LOOP_OFF);
-						fmodutils.ERRCHECK(result);
+						fmodUtils.ERRCHECK(result);
 						if (lbDontPlayNextSample)
 						{
 							lbDontPlayNextSample = false;
 						}
 						else
 						{
-							result = app.systemFMOD.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
-							fmodutils.ERRCHECK(result);
+							result = app.fmodManager.systemFMOD.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
+							fmodUtils.ERRCHECK(result);
 
 							if (channel != null)
 								channel.setCallback(cbFMOD);
@@ -1582,11 +1352,11 @@ namespace Aural_Probe
 						int pri = 0;
 						uint length = 0;
 						result = sound.getFormat(ref stype, ref sformat, ref schannels, ref sbits);
-						fmodutils.ERRCHECK(result);
+						fmodUtils.ERRCHECK(result);
 						result = sound.getDefaults(ref freq, ref vol, ref pan, ref pri);
-						fmodutils.ERRCHECK(result);
+						fmodUtils.ERRCHECK(result);
 						result = sound.getLength(ref length, FMOD.TIMEUNIT.MS);
-						fmodutils.ERRCHECK(result);
+						fmodUtils.ERRCHECK(result);
 						string lengthstr;
 						lengthstr = (length / (float)1000).ToString() + "s";
 						statusBarProperties.Text =
@@ -1686,18 +1456,18 @@ namespace Aural_Probe
 			try
 			{
 				if (e.KeyCode == Keys.Enter)
-					ExploreSamples(sender, e);
+					app.ExploreSamples(sender, e);
 				else if (e.Control && e.Shift && e.KeyCode == Keys.C)
-					CopySamplesShortcut(sender, e);
+					app.CopySamplesShortcut(sender, e);
 				else if (e.Control && e.KeyCode == Keys.C)
-					CopySamples(sender, e);
+					app.CopySamples(sender, e);
 				else if (e.KeyCode == Keys.Space)
 				{
-					AddRemoveFromFavorites(sender, e);
+					app.AddRemoveFromFavorites(sender, e);
 					e.SuppressKeyPress = true; // prevents selection from being reset
 				}
 				if (e.KeyCode == Keys.Delete)
-					DeleteSamples(sender, e);
+					app.DeleteSamples(sender, e);
 			}
 			catch (System.Exception ex)
 			{
@@ -1797,10 +1567,10 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (app.systemFMOD != null && bFMODInitialised && channel != null)
+				if (app.fmodManager != null && app.fmodManager.systemFMOD != null && app.fmodManager.bFMODInitialised && channel != null)
 				{
-					FMOD.RESULT result = app.systemFMOD.update();
-					fmodutils.ERRCHECK(result);
+					FMOD.RESULT result = app.fmodManager.systemFMOD.update();
+					fmodUtils.ERRCHECK(result);
 				}
 			}
 			catch (System.Exception ex)

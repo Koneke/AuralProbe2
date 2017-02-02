@@ -37,25 +37,8 @@ namespace Aural_Probe
 
 	public class App
 	{
-		// fmod
-		// {
-		public FMOD.System systemFMOD  = null;
-		public static FMOD.Sound sound  = null;
-		private FMOD.Channel channel = null;
-		private bool bFMODInitialised = false;
-		public bool bAutoPlayNextSample = false;
-		public int nAutoPlayRepeatsLeft = 0;
-		private FMOD.CHANNEL_CALLBACK cbFMOD = null;
-
-		public static void ERRCHECK(FMOD.RESULT result)
-		{
-			if (result != FMOD.RESULT.OK && result != FMOD.RESULT.ERR_INVALID_PARAM && result != FMOD.RESULT.ERR_FORMAT && result != FMOD.RESULT.ERR_FILE_BAD && result != FMOD.RESULT.ERR_TOOMANYCHANNELS)
-			{
-				MessageBox.Show("FMOD error! " + result + " - " + FMOD.Error.String(result));
-				Environment.Exit(-1);
-			}
-		}
-		// }
+		public FmodManager fmodManager;
+		public FMOD.CHANNEL_CALLBACK cbFMOD = null;
 
 		private MainForm mainForm;
 		/*private ConfigurationForm configurationForm;
@@ -139,8 +122,6 @@ namespace Aural_Probe
 			sampleIndicesCount = new int[configFile.kMaxCategories];
 			sampleFavoritesCount = new int[configFile.kMaxCategories];
 
-			cbFMOD = new FMOD.CHANNEL_CALLBACK(MainForm.soundEndedCallback);
-
 			lbFavoritesOnly = false;
 
 			bUseCachedSamplesIfPossible = true; // set to true once on startup
@@ -182,39 +163,7 @@ namespace Aural_Probe
 		{
 			Application.ApplicationExit += new EventHandler(Application_ApplicationExit);
 			SystemEvents.SessionEnding += new SessionEndingEventHandler(SystemEvents_SessionEnding);
-		}
-
-		public void InitFmod()
-		{
-			try
-			{
-				uint version = 0;
-				FMOD.RESULT	 result;
-
-				result = FMOD.Factory.System_Create(ref systemFMOD);
-				ERRCHECK(result);
-
-				result = systemFMOD.getVersion(ref version);
-				ERRCHECK(result);
-				if (version < FMOD.VERSION.number)
-				{
-					MessageBox.Show("Error!  You are using an old version of FMOD " + version.ToString("X") + ".  This program requires " + FMOD.VERSION.number.ToString("X") + ".");
-					Application.Exit();
-				}
-
-				TrySettingOutputDevice();
-
-				result = systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
-				ERRCHECK(result);
-
-				bFMODInitialised = true;
-			}
-			catch
-			{
-				MessageBox.Show("Error! Could not find FMOD DLL.", "FMOD DLL missing!",
-					MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-				Environment.Exit(-1);
-			}
+			cbFMOD = new FMOD.CHANNEL_CALLBACK(MainForm.soundEndedCallback);
 		}
 
 		public void foo(MainForm mainForm)
@@ -226,7 +175,7 @@ namespace Aural_Probe
 				this.Init();
 				this.InitContextMenu();
 				this.InitHandlers();
-				this.InitFmod();
+				this.fmodManager = new FmodManager(this);
 			}
 			catch (System.Exception e)
 			{
@@ -268,28 +217,6 @@ namespace Aural_Probe
 			}
 		}
 
-		private void TrySettingOutputDevice()
-		{
-			int numDrivers = 0;
-			StringBuilder driverName = new StringBuilder(256);
-			FMOD.RESULT result;
-			result = systemFMOD.getNumDrivers(ref numDrivers);
-			ERRCHECK(result);
-
-			for (int count = 0; count < numDrivers; count++)
-			{
-				FMOD.GUID guid = new FMOD.GUID();
-				result = systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
-				ERRCHECK(result);
-
-				if (driverName.ToString() == configFile.defaultSoundDevice)
-				{
-					result = systemFMOD.setDriver(count);
-					ERRCHECK(result);
-				}
-			}
-		}
-
 		public int CalculateRealSampleIndex(int listBoxIndex)
 		{
 			try
@@ -299,8 +226,12 @@ namespace Aural_Probe
 				else
 				{
 					int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
+
 					if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+					{
 						return -1;
+					}
+
 					int nFavoriteCount = 0;
 					for (int i = 0; i < sampleIndicesCount[nCurrentCategory]; ++i)
 					{
@@ -321,32 +252,11 @@ namespace Aural_Probe
 			return -1;
 		}
 
-		private void StopSoundPlayback()
-		{
-			if (channel != null)
-			{
-				bool bPlaying = false;
-				channel.isPlaying(ref bPlaying);
-				if (bPlaying)
-				{
-					channel.stop();
-					bAutoPlayNextSample = false;
-				}
-			}
-			if (sound != null)
-			{
-				FMOD.RESULT result;
-				result = sound.release();
-				ERRCHECK(result);
-				sound = null;
-			}
-		}
-
-		private void ExploreSamples(object sender, EventArgs e)
+		public void ExploreSamples(object sender, EventArgs e)
 		{
 			try
 			{
-				StopSoundPlayback();
+				fmodManager.StopSoundPlayback();
 
 				int nCurrentCategory = mainForm.categoriesList.SelectedIndex;
 				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0) return;
@@ -379,7 +289,7 @@ namespace Aural_Probe
 			}
 		}
 
-		private void CopySamples(object sender, EventArgs e)
+		public void CopySamples(object sender, EventArgs e)
 		{
 			try
 			{
@@ -408,7 +318,7 @@ namespace Aural_Probe
 			}
 		}
 
-		private void CopySamplesShortcut(object sender, EventArgs e)
+		public void CopySamplesShortcut(object sender, EventArgs e)
 		{
 			try
 			{
@@ -435,7 +345,7 @@ namespace Aural_Probe
 			}
 		}
 
-		private void AddRemoveFromFavorites(object sender, EventArgs e)
+		public void AddRemoveFromFavorites(object sender, EventArgs e)
 		{
 			try
 			{
@@ -490,9 +400,9 @@ namespace Aural_Probe
 			}
 		}
 
-		private void DeleteSamples(object sender, EventArgs e)
+		public void DeleteSamples(object sender, EventArgs e)
 		{
-			StopSoundPlayback();
+			fmodManager.StopSoundPlayback();
 
 			try
 			{
@@ -547,7 +457,7 @@ namespace Aural_Probe
 			}
 		}
 
-		private void Application_ApplicationExit(object sender, EventArgs e) 
+		public void Application_ApplicationExit(object sender, EventArgs e) 
 		{
 			try
 			{
@@ -578,7 +488,7 @@ namespace Aural_Probe
 			}
 		}
 
-		private void SystemEvents_SessionEnding(object sender, SessionEndingEventArgs e) 
+		public void SystemEvents_SessionEnding(object sender, SessionEndingEventArgs e) 
 		{
 			try
 			{

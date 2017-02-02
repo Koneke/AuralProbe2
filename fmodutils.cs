@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace Aural_Probe
 {
-	class fmodutils
+	class fmodUtils
 	{
 		public static void ERRCHECK(FMOD.RESULT result)
 		{

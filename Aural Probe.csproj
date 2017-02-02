@@ -115,6 +115,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="fmod.cs" />
+    <Compile Include="fmodManager.cs" />
     <Compile Include="fmodutils.cs" />
     <Compile Include="fmod_dsp.cs" />
     <Compile Include="fmod_errors.cs" />
