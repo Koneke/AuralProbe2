@@ -16,8 +16,6 @@ namespace Aural_Probe
 		private const string OldFormatConfigFilePath = "Aural Probe.cfg";
 
 		[JsonIgnore] public const int MaxCategories = 256;
-		[JsonIgnore] public const int MaxSearchStringsPerCategory = 256;
-		[JsonIgnore] public const int MaxDirectories = 256;
 
 		// Version History
 		// 0 = Unversioned config file

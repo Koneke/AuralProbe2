@@ -1,17 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Windows.Forms;
+using FMOD;
 
 namespace Aural_Probe
 {
 	public class FmodManager
 	{
 		private App app;
-		public FMOD.System systemFMOD  = null;
-		public static FMOD.Sound sound  = null;
+		public FMOD.System systemFMOD;
+		public static FMOD.Sound sound;
 		public FMOD.Channel channel = null;
-		public bool bFMODInitialised = false;
-		public bool bAutoPlayNextSample = false;
+		public bool bFMODInitialised;
+		public bool bAutoPlayNextSample;
 		public int nAutoPlayRepeatsLeft = 0;
 		public FMOD.CHANNEL_CALLBACK cbFMOD = null;
 
@@ -22,25 +24,24 @@ namespace Aural_Probe
 			try
 			{
 				uint version = 0;
-				FMOD.RESULT	 result;
+				var result = Factory.System_Create(ref this.systemFMOD);
 
-				result = FMOD.Factory.System_Create(ref systemFMOD);
 				fmodUtils.ERRCHECK(result);
 
-				result = systemFMOD.getVersion(ref version);
+				result = this.systemFMOD.getVersion(ref version);
 				fmodUtils.ERRCHECK(result);
-				if (version < FMOD.VERSION.number)
+				if (version < VERSION.number)
 				{
-					MessageBox.Show("Error!  You are using an old version of FMOD " + version.ToString("X") + ".  This program requires " + FMOD.VERSION.number.ToString("X") + ".");
+					MessageBox.Show("Error!  You are using an old version of FMOD " + version.ToString("X") + ".  This program requires " + VERSION.number.ToString("X") + ".");
 					Application.Exit();
 				}
 
-				TrySettingOutputDevice();
+				this.TrySettingOutputDevice();
 
-				result = systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
+				result = this.systemFMOD.init(32, INITFLAGS.NORMAL, (IntPtr)null);
 				fmodUtils.ERRCHECK(result);
 
-				bFMODInitialised = true;
+				this.bFMODInitialised = true;
 			}
 			catch
 			{
@@ -50,23 +51,173 @@ namespace Aural_Probe
 			}
 		}
 
-		private void TrySettingOutputDevice()
+		private int GetNumberOfDrivers()
 		{
-			int numDrivers = 0;
-			StringBuilder driverName = new StringBuilder(256);
-			FMOD.RESULT result;
-			result = systemFMOD.getNumDrivers(ref numDrivers);
-			fmodUtils.ERRCHECK(result);
+			var numDrivers = -1;
 
-			for (int count = 0; count < numDrivers; count++)
+			try
 			{
-				FMOD.GUID guid = new FMOD.GUID();
-				result = systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
+				var result = MainForm.app.fmodManager.systemFMOD.getNumDrivers(ref numDrivers);
+				fmodUtils.ERRCHECK(result);
+			}
+			catch (Exception e)
+			{
+				MessageBox.Show(
+					"Failed to get number of audio drivers! \n" + e.Message,
+					"FMOD error",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Error);
+			}
+
+			return numDrivers;
+		}
+
+		public void TryPrimarySoundDeviceHack()
+		{
+			try
+			{
+				int currentDriver = this.GetCurrentDriver();
+				var result = MainForm.app.fmodManager.systemFMOD.getDriver(ref currentDriver);
+				fmodUtils.ERRCHECK(result);
+				
+				// hack to select primary sound device - will this work???
+				if (currentDriver == -1)
+				{
+					this.SetCurrentDriver(0);
+				}
+			}
+			catch (Exception e)
+			{
+				MessageBox.Show(
+					"Failed to set current driver to primary audio device! \n" + e.Message,
+					"FMOD error",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Error);
+			}
+		}
+
+		public void ChangeSoundOutput(int newDriver)
+		{
+			try
+			{
+			if (newDriver == 0)
+			{
+				newDriver = -1;
+			}
+
+			if (newDriver < this.GetNumberOfDrivers())
+			{
+				if (MainForm.sound != null)
+				{
+					MainForm.sound.release();
+				}
+
+				MainForm.sound = null;
+
+				MainForm.app.fmodManager.systemFMOD.close();
+				MainForm.app.fmodManager.systemFMOD.setDriver(newDriver);
+				var result = MainForm.app.fmodManager.systemFMOD.init(32, INITFLAGS.NORMAL, (IntPtr)null);
+				fmodUtils.ERRCHECK(result);
+			}
+			}
+			catch (Exception e)
+			{
+				MessageBox.Show(
+					"Failed to change sound output device! \n" + e.Message,
+					"FMOD error",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Error);
+			}
+		}
+
+		// convert to getter/setter pair
+		private void SetCurrentDriver(int driver)
+		{
+			try
+			{
+				var result = this.systemFMOD.setDriver(driver);
+				fmodUtils.ERRCHECK(result);
+			}
+			catch (Exception e)
+			{
+				MessageBox.Show(
+					"Failed to set current driver! \n" + e.Message,
+					"FMOD error",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Error);
+			}
+		}
+
+		public int GetCurrentDriver()
+		{
+			try
+			{
+				var currentDriver = 0;
+				var result = this.systemFMOD.getDriver(ref currentDriver);
 				fmodUtils.ERRCHECK(result);
 
-				if (driverName.ToString() == app.Files.configFile.DefaultSoundDevice)
+				return currentDriver;
+			}
+			catch (Exception e)
+			{
+				MessageBox.Show(
+					"Failed to get current driver! \n" + e.Message,
+					"FMOD error",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Error);
+			}
+
+			return -1;
+		}
+
+		public List<string> GetAvailableDrivers()
+		{
+			try
+			{
+				var driverNames = new List<string>();
+				var driverName = new StringBuilder(256);
+
+				for (var count = 0; count < this.GetNumberOfDrivers(); count++)
 				{
-					result = systemFMOD.setDriver(count);
+					var guid = new GUID();
+					var result = MainForm.app.fmodManager.systemFMOD.getDriverInfo(
+						count, driverName, driverName.Capacity, ref guid);
+
+					fmodUtils.ERRCHECK(result);
+					driverNames.Add(driverName.ToString());
+				}
+
+				return driverNames;
+			}
+			catch (Exception)
+			{
+				MessageBox.Show(
+					"Failed to get number of audio drivers!",
+					"FMOD error",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Error);
+			}
+
+			return null;
+		}
+
+		private void TrySettingOutputDevice()
+		{
+			var numDrivers = 0;
+			var driverName = new StringBuilder(256);
+
+			var result = this.systemFMOD.getNumDrivers(ref numDrivers);
+			fmodUtils.ERRCHECK(result);
+
+			for (var count = 0; count < numDrivers; count++)
+			{
+				var guid = new GUID();
+				result = this.systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
+				fmodUtils.ERRCHECK(result);
+
+				if (driverName.ToString() == this.app.Files.configFile.DefaultSoundDevice)
+				{
+					result = this.systemFMOD.setDriver(count);
 					fmodUtils.ERRCHECK(result);
 				}
 			}
@@ -74,20 +225,19 @@ namespace Aural_Probe
 
 		public void StopSoundPlayback()
 		{
-			if (channel != null)
+			if (this.channel != null)
 			{
-				bool bPlaying = false;
-				channel.isPlaying(ref bPlaying);
+				var bPlaying = false;
+				this.channel.isPlaying(ref bPlaying);
 				if (bPlaying)
 				{
-					channel.stop();
-					bAutoPlayNextSample = false;
+					this.channel.stop();
+					this.bAutoPlayNextSample = false;
 				}
 			}
 			if (sound != null)
 			{
-				FMOD.RESULT result;
-				result = sound.release();
+				var result = sound.release();
 				fmodUtils.ERRCHECK(result);
 				sound = null;
 			}

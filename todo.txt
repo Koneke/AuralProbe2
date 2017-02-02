@@ -1,5 +1,3 @@
-- human readable config file
-  - protobuf for the config file?
 - do *something*, preferably something violent, to ScanFoldersProcess.cs
 - just keep decoupling/structuring things
 - stop handling the sample library with arrays

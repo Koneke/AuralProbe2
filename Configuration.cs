@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using System.IO;
-using System.Text;
+using System.Linq;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 
 namespace Aural_Probe
 {
@@ -14,245 +16,198 @@ namespace Aural_Probe
 	// kinda weird and copied up from ConfigFile, but I guess this is the more "proper" way?
 	public class ConfigurationForm : Form
 	{
-		private Button buttonOK;
+		#region Controls
+		// freely floating controls
+		private Button buttonOk;
 		private Button buttonCancel;
-		private ListBox listCategories;
-		private TextBox textName;
-		private TextBox textWildcard;
-		private Label label2;
-		private GroupBox groupCategories;
-		private GroupBox groupDirectories;
-		private GroupBox groupGeneral;
-		private TextBox textDirectories;
-		/// <summary>
-		/// Required designer variable.
-		/// </summary>
-		private System.ComponentModel.Container components = null;
 
-		public string[] categoryName;
-		public string[,] categorySearchStrings;
-		public bool[] categoryUseRegularExpressions;
-		public string[] searchDirectories;
-		public int lnNumCategories;
-		public int[] lnNumCategorySearchStrings;
-		public int lnNumSearchDirectories;
-		private Button buttonDelete;
+		// groupGeneral
+		private GroupBox groupGeneral;
+		private Label labelSampleDisplaySize;
+		private NumericUpDown numericSampleDisplaySizeW;
+		private Label labelSampleDisplaySizeX;
+		private NumericUpDown numericSampleDisplaySizeH;
+		private CheckBox checkBoxAlwaysOnTop;
+		private CheckBox checkBoxRescanPrompt;
+		private CheckBox checkBoxIncludeFilePaths;
+		private CheckBox checkBoxAutoplay;
+		private NumericUpDown numericAutoplayRepeats;
+		private Label labelAutoplayTimes;
+
+		// groupCategories
+		private GroupBox groupCategories;
+		private ListBox listCategories;
+		private Label labelName;
+		private TextBox textName;
+		private Label labelSearchCriteria;
+		private TextBox textWildcard;
+		private CheckBox checkBoxUseRegularExpressions;
+		private LinkLabel linkLabelUseRegularExpressionsHelp;
+		private Button buttonMoveUp;
+		private Button buttonMoveDown;
 		private Button buttonInsert;
 		private Button buttonReplace;
-		public bool bDataDirty;
-		private GroupBox groupBox1;
+		private Button buttonDelete;
+
+		// groupDirectories
+		private GroupBox groupDirectories;
+		private TextBox textDirectories;
+
+		// groupFileTypes
+		private GroupBox groupFileTypes;
 		private CheckBox checkBoxWAV;
 		private CheckBox checkBoxAIFF;
 		private CheckBox checkBoxFLAC;
 		private CheckBox checkBoxMP3;
 		private CheckBox checkBoxWMA;
 		private CheckBox checkBoxOGG;
-		private Label label1;
-		private FolderBrowserDialog folderBrowserDialog1;
-		private GroupBox groupBox2;
+
+		// groupFavorites
+		private GroupBox groupFavorites;
 		private TextBox textBoxDefaultFavorites;
-		private CheckBox checkBoxAutoplay;
-		private NumericUpDown numericAutoplayRepeats;
-		private Label label4;
-		private CheckBox checkBoxRescanPrompt;
-		private CheckBox checkBoxIncludeFilePaths;
-		private Label label3;
-		private NumericUpDown numericSampleDisplaySizeW;
-		private Label label5;
-		private NumericUpDown numericSampleDisplaySizeH;
-		private GroupBox groupBox3;
+
+		// groupSoundOutput
+		private GroupBox groupSoundOutput;
 		private ComboBox comboOutputDevice;
-		private CheckBox checkBoxAlwaysOnTop;
-		private CheckBox checkBoxUseRegularExpressions;
-		private LinkLabel linkLabelUseRegularExpressionsHelp;
-		private Button buttonMoveUp;
-		private Button buttonMoveDown;
-		public bool bNeedToRescanFolders;
+		#endregion
+
+		/// <summary>
+		/// Required designer variable.
+		/// </summary>
+		private readonly System.ComponentModel.Container components = null;
+
+		// config file we're currently working on.
+		private ConfigFile configFile;
+
+		private int CategoryIndex => this.listCategories.SelectedIndex;
+
+		// Don't run automatic control -> config stuff when still populating the controls
+		private bool loading;
+
+		// Do we have unsaved changes?
+		private bool dataIsDirty;
+
+		// Have we changed anything that affects which files/folders are visible?
+		private bool needToRescanFolders;
 		
 		public ConfigurationForm()
 		{
-			//
 			// Required for Windows Form Designer support
-			//
-			InitializeComponent();
-
-			categoryName = new string[ConfigFile.MaxCategories];
-			categorySearchStrings = new string[ConfigFile.MaxCategories, ConfigFile.MaxSearchStringsPerCategory];
-			categoryUseRegularExpressions = new bool[ConfigFile.MaxCategories];
-			searchDirectories = new string[ConfigFile.MaxDirectories];
-			lnNumCategorySearchStrings = new int[ConfigFile.MaxCategories];
+			this.InitializeComponent();
 		}
 
-		public void InitSoundOutputUI()
+		// Set up device output combo box
+		private void InitSoundOutputUI()
 		{
-			// Set up device output combo box
-			FMOD.RESULT result;
-			comboOutputDevice.Items.Clear();
-			var nCurrentDriver = 0;
-			var numDrivers = 0;
-			var driverName = new StringBuilder(256);
-			result = MainForm.app.fmodManager.systemFMOD.getDriver(ref nCurrentDriver);
-			fmodUtils.ERRCHECK(result);
-			
-			// hack to select primary sound device - will this work???
-			if (nCurrentDriver == -1)
+			MainForm.app.fmodManager.TryPrimarySoundDeviceHack();
+
+			this.comboOutputDevice.Items.Clear();
+			foreach (var driver in MainForm.app.fmodManager.GetAvailableDrivers())
 			{
-				nCurrentDriver = 0;
+				this.comboOutputDevice.Items.Add(driver);
 			}
 
-			result = MainForm.app.fmodManager.systemFMOD.getNumDrivers(ref numDrivers);
-			fmodUtils.ERRCHECK(result);
-			for (var count = 0; count < numDrivers; count++)
-			{
-				var guid = new FMOD.GUID();
-				result = MainForm.app.fmodManager.systemFMOD.getDriverInfo(count, driverName, driverName.Capacity, ref guid);
-				fmodUtils.ERRCHECK(result);
-				comboOutputDevice.Items.Add(driverName.ToString());
-			}
-			comboOutputDevice.SelectedIndex = nCurrentDriver;
-
+			this.comboOutputDevice.SelectedIndex = MainForm.app.fmodManager.GetCurrentDriver();
 		}
 
-		public void ChangeSoundOutput()
+		private void ChangeSoundOutput()
 		{
-			var nSelectedOutputDevice = comboOutputDevice.SelectedIndex;
-
-			if (nSelectedOutputDevice == 0)
-			{
-				nSelectedOutputDevice = -1;
-			}
-
-			if (nSelectedOutputDevice < comboOutputDevice.Items.Count)
-			{
-				if (MainForm.sound != null)
-				{
-					MainForm.sound.release();
-				}
-
-				MainForm.sound = null;
-
-				MainForm.app.fmodManager.systemFMOD.close();
-				MainForm.app.fmodManager.systemFMOD.setDriver(nSelectedOutputDevice);
-				var result = MainForm.app.fmodManager.systemFMOD.init(32, FMOD.INITFLAGS.NORMAL, (IntPtr)null);
-				fmodUtils.ERRCHECK(result);
-			}
+			MainForm.app.fmodManager.ChangeSoundOutput(this.comboOutputDevice.SelectedIndex);
 		}
 
-		private void InitFromConfigFile(object sender, System.EventArgs e)
+		private static string GetCategoryListName(Category category)
 		{
-			this.numericSampleDisplaySizeW.Value = MainForm.configFile.SampleDisplaySizeW;
-			this.numericSampleDisplaySizeH.Value = MainForm.configFile.SampleDisplaySizeH;
-			this.numericAutoplayRepeats.Value = MainForm.configFile.AutoplayRepeats;
+			return category.Name + "\t" + string.Join(",", category.SearchStrings);
+		}
 
-			this.listCategories.Items.Clear();
+		private void LoadConfigValuesToControls()
+		{
+			this.loading = true;
 
-			this.lnNumCategories = MainForm.configFile.Categories.Count;
-			for (var i = 0; i < MainForm.configFile.Categories.Count; ++i)
-			{
-				this.categoryName[i] = MainForm.configFile.Categories[i].Name;
-				this.lnNumCategorySearchStrings[i] = MainForm.configFile.Categories[i].SearchStrings.Count;
-				var categoryListName = "";
-				categoryListName += MainForm.configFile.Categories[i].Name + "\t";
-				categoryListName += string.Join(",", MainForm.configFile.Categories[i].SearchStrings);
+			this.numericSampleDisplaySizeW.Value = this.configFile.SampleDisplaySizeW;
+			this.numericSampleDisplaySizeH.Value = this.configFile.SampleDisplaySizeH;
+			this.numericAutoplayRepeats.Value = this.configFile.AutoplayRepeats;
 
-				this.categoryUseRegularExpressions[i] = MainForm.configFile.Categories[i].UseRegex;
-				this.listCategories.Items.Add(categoryListName);
-			}
+			this.UpdateCategoryList();
 
-			this.listCategories.SelectedIndex = MainForm.configFile.Categories.Count > 0 ? 0 : -1;
-			this.checkBoxRescanPrompt.Checked = MainForm.configFile.RescanPrompt;
-			this.checkBoxIncludeFilePaths.Checked = MainForm.configFile.IncludeFilePaths;
-			this.checkBoxAutoplay.Checked = MainForm.configFile.Autoplay;
-			this.checkBoxAlwaysOnTop.Checked = MainForm.configFile.AlwaysOnTop;
-			this.numericAutoplayRepeats.Enabled = checkBoxAutoplay.Checked;
+			this.listCategories.SelectedIndex = this.configFile.Categories.Count > 0 ? 0 : -1;
+			this.checkBoxRescanPrompt.Checked = this.configFile.RescanPrompt;
+			this.checkBoxIncludeFilePaths.Checked = this.configFile.IncludeFilePaths;
+			this.checkBoxAutoplay.Checked = this.configFile.Autoplay;
+			this.checkBoxAlwaysOnTop.Checked = this.configFile.AlwaysOnTop;
+			this.numericAutoplayRepeats.Enabled = this.checkBoxAutoplay.Checked;
 
-			this.checkBoxWAV.Checked = MainForm.configFile.LoadWav;
-			this.checkBoxAIFF.Checked = MainForm.configFile.LoadAiff;
-			this.checkBoxFLAC.Checked = MainForm.configFile.LoadFlac;
-			this.checkBoxMP3.Checked = MainForm.configFile.LoadMp3;
-			this.checkBoxWMA.Checked = MainForm.configFile.LoadWma;
-			this.checkBoxOGG.Checked = MainForm.configFile.LoadOgg;
+			this.checkBoxWAV.Checked = this.configFile.LoadWav;
+			this.checkBoxAIFF.Checked = this.configFile.LoadAiff;
+			this.checkBoxFLAC.Checked = this.configFile.LoadFlac;
+			this.checkBoxMP3.Checked = this.configFile.LoadMp3;
+			this.checkBoxWMA.Checked = this.configFile.LoadWma;
+			this.checkBoxOGG.Checked = this.configFile.LoadOgg;
 
 			this.textDirectories.Clear();
-			this.lnNumSearchDirectories = MainForm.configFile.SearchDirectories.Count;
+			this.textDirectories.Text = string.Join("\n", this.configFile.SearchDirectories);
 
-			var dirsTemp = new string[this.lnNumSearchDirectories];
-			for (var i = 0; i < MainForm.configFile.SearchDirectories.Count; ++i)
-			{
-				dirsTemp[i] = this.searchDirectories[i] = MainForm.configFile.SearchDirectories[i];
-			}
-			this.textDirectories.Lines = dirsTemp;
-
-			this.textBoxDefaultFavorites.Text = MainForm.configFile.DefaultFavoritesDirectory;
+			this.textBoxDefaultFavorites.Text = this.configFile.DefaultFavoritesDirectory;
 
 			this.InitSoundOutputUI();
 
-			this.bDataDirty = false;
-			this.bNeedToRescanFolders = false;
+			this.loading = false;
+
+			this.UpdateCheckboxes();
+			this.UpdateNumerics();
 		}
 
-		public void SaveToConfigFile()
+		private void InitFromConfigFile(object sender, EventArgs e)
 		{
-			if (bDataDirty)
+			this.configFile =
+				JsonConvert.DeserializeObject<ConfigFile>(
+					JsonConvert.SerializeObject(MainForm.configFile));
+
+			this.LoadConfigValuesToControls();
+
+			this.dataIsDirty = false;
+			this.needToRescanFolders = false;
+		}
+
+		private void SaveSearchDirectories()
+		{
+			var searchDirectories = this.textDirectories.Text
+				.Split(',', ';', '\n', '\r', '\t')
+				.ToList();
+
+			var invalidDirectories = "";
+
+			foreach (var searchDirectory in searchDirectories)
 			{
-				MainForm.configFile.SampleDisplaySizeW = (int)numericSampleDisplaySizeW.Value;
-				MainForm.configFile.SampleDisplaySizeH = (int)numericSampleDisplaySizeH.Value;
-				MainForm.configFile.AutoplayRepeats = (int)numericAutoplayRepeats.Value;
-
-				for (var i = 0; i < MainForm.configFile.Categories.Count; ++i)
+				if (searchDirectory.Length > 0)
 				{
-					MainForm.configFile.Categories[i].Name = categoryName[i];
-
-					for (var j = 0; j < lnNumCategorySearchStrings[i]; ++j)
+					if (!Directory.Exists(searchDirectory))
 					{
-						MainForm.configFile.Categories[i].SearchStrings[j] = categorySearchStrings[i,j];
-					}
-
-					MainForm.configFile.Categories[i].UseRegex = categoryUseRegularExpressions[i];
-				}
-
-				// do directories
-				var directories = textDirectories.Text;
-				var delimStr = ",;\n\t\r";
-				var delimiter = delimStr.ToCharArray();
-				string[] split = null;
-				split = directories.Split(delimiter, ConfigFile.MaxSearchStringsPerCategory);
-				lnNumSearchDirectories = 0;
-				
-				// update new search directories
-				var invalidDirectories = "";
-				for (var i = 0; i < split.Length; ++i)
-				{
-					if (split[i].Length > 0)
-					{
-						if (!Directory.Exists(split[i]))
-							invalidDirectories += split[i] + "\n";
-
-						MainForm.configFile.SearchDirectories[lnNumSearchDirectories] = searchDirectories[lnNumSearchDirectories] = split[i];
-						lnNumSearchDirectories++;
+						invalidDirectories += searchDirectory + "\n";
 					}
 				}
-				if (invalidDirectories != "")
-					MessageBox.Show("Warning! The following search folders do not exist:\n\n" + invalidDirectories, "Warning!", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+			}
 
-				MainForm.configFile.RescanPrompt = checkBoxRescanPrompt.Checked;
-				MainForm.configFile.IncludeFilePaths = checkBoxIncludeFilePaths.Checked;
-				MainForm.configFile.Autoplay = checkBoxAutoplay.Checked;
-				MainForm.configFile.AlwaysOnTop = checkBoxAlwaysOnTop.Checked;
-				MainForm.configFile.DefaultFavoritesDirectory = textBoxDefaultFavorites.Text;
+			if (invalidDirectories != "")
+			{
+				MessageBox.Show("Warning! The following search folders do not exist:\n\n" + invalidDirectories, "Warning!", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+			}
 
-				MainForm.configFile.LoadWav = MainForm.configFile.LoadWav = checkBoxWAV.Checked;	
-				MainForm.configFile.LoadAiff = MainForm.configFile.LoadAiff = checkBoxAIFF.Checked;	
-				MainForm.configFile.LoadFlac = MainForm.configFile.LoadFlac = checkBoxFLAC.Checked;	
-				MainForm.configFile.LoadMp3 = MainForm.configFile.LoadMp3 = checkBoxMP3.Checked;	
-				MainForm.configFile.LoadWma = MainForm.configFile.LoadWma = checkBoxWMA.Checked;	
-				MainForm.configFile.LoadOgg = MainForm.configFile.LoadOgg = checkBoxOGG.Checked;	
+			this.configFile.SearchDirectories = searchDirectories;
+		}
 
-				MainForm.configFile.DefaultSoundDevice = comboOutputDevice.Text;
+		private void SaveToConfigFile()
+		{
+			if (this.dataIsDirty)
+			{
+				this.SaveSearchDirectories();
+				this.configFile.DefaultFavoritesDirectory = this.textBoxDefaultFavorites.Text;
+				this.configFile.DefaultSoundDevice = this.comboOutputDevice.Text;
 
-				MainForm.configFile.Save();
+				this.configFile.Save();
+				MainForm.app.Files.configFile = this.configFile;
 
-				this.bDataDirty = false;
+				this.dataIsDirty = false;
 			}
 		}
 
@@ -276,7 +231,7 @@ namespace Aural_Probe
 		/// </summary>
 		private void InitializeComponent()
 		{
-			this.buttonOK = new System.Windows.Forms.Button();
+			this.buttonOk = new System.Windows.Forms.Button();
 			this.buttonCancel = new System.Windows.Forms.Button();
 			this.groupCategories = new System.Windows.Forms.GroupBox();
 			this.buttonMoveDown = new System.Windows.Forms.Button();
@@ -288,21 +243,21 @@ namespace Aural_Probe
 			this.buttonInsert = new System.Windows.Forms.Button();
 			this.buttonDelete = new System.Windows.Forms.Button();
 			this.textWildcard = new System.Windows.Forms.TextBox();
-			this.label2 = new System.Windows.Forms.Label();
+			this.labelSearchCriteria = new System.Windows.Forms.Label();
 			this.buttonReplace = new System.Windows.Forms.Button();
-			this.label1 = new System.Windows.Forms.Label();
+			this.labelName = new System.Windows.Forms.Label();
 			this.groupDirectories = new System.Windows.Forms.GroupBox();
 			this.textDirectories = new System.Windows.Forms.TextBox();
 			this.groupGeneral = new System.Windows.Forms.GroupBox();
 			this.numericSampleDisplaySizeH = new System.Windows.Forms.NumericUpDown();
-			this.label3 = new System.Windows.Forms.Label();
+			this.labelSampleDisplaySize = new System.Windows.Forms.Label();
 			this.numericSampleDisplaySizeW = new System.Windows.Forms.NumericUpDown();
 			this.checkBoxRescanPrompt = new System.Windows.Forms.CheckBox();
 			this.checkBoxIncludeFilePaths = new System.Windows.Forms.CheckBox();
 			this.numericAutoplayRepeats = new System.Windows.Forms.NumericUpDown();
 			this.checkBoxAutoplay = new System.Windows.Forms.CheckBox();
-			this.label4 = new System.Windows.Forms.Label();
-			this.label5 = new System.Windows.Forms.Label();
+			this.labelAutoplayTimes = new System.Windows.Forms.Label();
+			this.labelSampleDisplaySizeX = new System.Windows.Forms.Label();
 			this.checkBoxAlwaysOnTop = new System.Windows.Forms.CheckBox();
 			this.checkBoxWAV = new System.Windows.Forms.CheckBox();
 			this.checkBoxAIFF = new System.Windows.Forms.CheckBox();
@@ -310,11 +265,10 @@ namespace Aural_Probe
 			this.checkBoxMP3 = new System.Windows.Forms.CheckBox();
 			this.checkBoxWMA = new System.Windows.Forms.CheckBox();
 			this.checkBoxOGG = new System.Windows.Forms.CheckBox();
-			this.groupBox1 = new System.Windows.Forms.GroupBox();
-			this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
-			this.groupBox2 = new System.Windows.Forms.GroupBox();
+			this.groupFileTypes = new System.Windows.Forms.GroupBox();
+			this.groupFavorites = new System.Windows.Forms.GroupBox();
 			this.textBoxDefaultFavorites = new System.Windows.Forms.TextBox();
-			this.groupBox3 = new System.Windows.Forms.GroupBox();
+			this.groupSoundOutput = new System.Windows.Forms.GroupBox();
 			this.comboOutputDevice = new System.Windows.Forms.ComboBox();
 			this.groupCategories.SuspendLayout();
 			this.groupDirectories.SuspendLayout();
@@ -322,20 +276,20 @@ namespace Aural_Probe
 			((System.ComponentModel.ISupportInitialize)(this.numericSampleDisplaySizeH)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.numericSampleDisplaySizeW)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.numericAutoplayRepeats)).BeginInit();
-			this.groupBox1.SuspendLayout();
-			this.groupBox2.SuspendLayout();
-			this.groupBox3.SuspendLayout();
+			this.groupFileTypes.SuspendLayout();
+			this.groupFavorites.SuspendLayout();
+			this.groupSoundOutput.SuspendLayout();
 			this.SuspendLayout();
 			// 
-			// buttonOK
+			// buttonOk
 			// 
-			this.buttonOK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-			this.buttonOK.Location = new System.Drawing.Point(408, 16);
-			this.buttonOK.Name = "buttonOK";
-			this.buttonOK.Size = new System.Drawing.Size(72, 24);
-			this.buttonOK.TabIndex = 6;
-			this.buttonOK.Text = "&OK";
-			this.buttonOK.Click += new System.EventHandler(this.buttonOK_Click);
+			this.buttonOk.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+			this.buttonOk.Location = new System.Drawing.Point(408, 16);
+			this.buttonOk.Name = "buttonOk";
+			this.buttonOk.Size = new System.Drawing.Size(72, 24);
+			this.buttonOk.TabIndex = 6;
+			this.buttonOk.Text = "&OK";
+			this.buttonOk.Click += new System.EventHandler(this.buttonOK_Click);
 			// 
 			// buttonCancel
 			// 
@@ -349,8 +303,8 @@ namespace Aural_Probe
 			// 
 			// groupCategories
 			// 
-			this.groupCategories.Controls.Add(this.buttonMoveDown);
 			this.groupCategories.Controls.Add(this.buttonMoveUp);
+			this.groupCategories.Controls.Add(this.buttonMoveDown);
 			this.groupCategories.Controls.Add(this.linkLabelUseRegularExpressionsHelp);
 			this.groupCategories.Controls.Add(this.checkBoxUseRegularExpressions);
 			this.groupCategories.Controls.Add(this.textName);
@@ -358,9 +312,9 @@ namespace Aural_Probe
 			this.groupCategories.Controls.Add(this.buttonInsert);
 			this.groupCategories.Controls.Add(this.buttonDelete);
 			this.groupCategories.Controls.Add(this.textWildcard);
-			this.groupCategories.Controls.Add(this.label2);
+			this.groupCategories.Controls.Add(this.labelSearchCriteria);
 			this.groupCategories.Controls.Add(this.buttonReplace);
-			this.groupCategories.Controls.Add(this.label1);
+			this.groupCategories.Controls.Add(this.labelName);
 			this.groupCategories.Location = new System.Drawing.Point(8, 112);
 			this.groupCategories.Name = "groupCategories";
 			this.groupCategories.Size = new System.Drawing.Size(472, 170);
@@ -451,13 +405,13 @@ namespace Aural_Probe
 			this.textWildcard.Size = new System.Drawing.Size(240, 20);
 			this.textWildcard.TabIndex = 4;
 			// 
-			// label2
+			// labelSearchCriteria
 			// 
-			this.label2.Location = new System.Drawing.Point(224, 64);
-			this.label2.Name = "label2";
-			this.label2.Size = new System.Drawing.Size(152, 16);
-			this.label2.TabIndex = 3;
-			this.label2.Text = "Search Criteria:";
+			this.labelSearchCriteria.Location = new System.Drawing.Point(224, 64);
+			this.labelSearchCriteria.Name = "labelSearchCriteria";
+			this.labelSearchCriteria.Size = new System.Drawing.Size(152, 16);
+			this.labelSearchCriteria.TabIndex = 3;
+			this.labelSearchCriteria.Text = "Search Criteria:";
 			// 
 			// buttonReplace
 			// 
@@ -468,13 +422,13 @@ namespace Aural_Probe
 			this.buttonReplace.Text = "&Replace";
 			this.buttonReplace.Click += new System.EventHandler(this.buttonReplace_Click);
 			// 
-			// label1
+			// labelName
 			// 
-			this.label1.Location = new System.Drawing.Point(224, 16);
-			this.label1.Name = "label1";
-			this.label1.Size = new System.Drawing.Size(152, 16);
-			this.label1.TabIndex = 1;
-			this.label1.Text = "Name:";
+			this.labelName.Location = new System.Drawing.Point(224, 16);
+			this.labelName.Name = "labelName";
+			this.labelName.Size = new System.Drawing.Size(152, 16);
+			this.labelName.TabIndex = 1;
+			this.labelName.Text = "Name:";
 			// 
 			// groupDirectories
 			// 
@@ -489,8 +443,8 @@ namespace Aural_Probe
 			// textDirectories
 			// 
 			this.textDirectories.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-			| System.Windows.Forms.AnchorStyles.Left) 
-			| System.Windows.Forms.AnchorStyles.Right)));
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
 			this.textDirectories.Location = new System.Drawing.Point(8, 16);
 			this.textDirectories.Multiline = true;
 			this.textDirectories.Name = "textDirectories";
@@ -498,20 +452,19 @@ namespace Aural_Probe
 			this.textDirectories.Size = new System.Drawing.Size(368, 88);
 			this.textDirectories.TabIndex = 0;
 			this.textDirectories.TextChanged += new System.EventHandler(this.OnSearchFoldersChanged);
-			this.textDirectories.KeyDown += new System.Windows.Forms.KeyEventHandler(this.textDirectories_KeyDown);
 			// 
 			// groupGeneral
 			// 
+			this.groupGeneral.Controls.Add(this.labelSampleDisplaySize);
 			this.groupGeneral.Controls.Add(this.numericSampleDisplaySizeH);
-			this.groupGeneral.Controls.Add(this.label3);
+			this.groupGeneral.Controls.Add(this.labelSampleDisplaySizeX);
 			this.groupGeneral.Controls.Add(this.numericSampleDisplaySizeW);
+			this.groupGeneral.Controls.Add(this.checkBoxAlwaysOnTop);
 			this.groupGeneral.Controls.Add(this.checkBoxRescanPrompt);
 			this.groupGeneral.Controls.Add(this.checkBoxIncludeFilePaths);
 			this.groupGeneral.Controls.Add(this.numericAutoplayRepeats);
 			this.groupGeneral.Controls.Add(this.checkBoxAutoplay);
-			this.groupGeneral.Controls.Add(this.label4);
-			this.groupGeneral.Controls.Add(this.label5);
-			this.groupGeneral.Controls.Add(this.checkBoxAlwaysOnTop);
+			this.groupGeneral.Controls.Add(this.labelAutoplayTimes);
 			this.groupGeneral.Location = new System.Drawing.Point(8, 8);
 			this.groupGeneral.Name = "groupGeneral";
 			this.groupGeneral.Size = new System.Drawing.Size(384, 96);
@@ -523,59 +476,59 @@ namespace Aural_Probe
 			// 
 			this.numericSampleDisplaySizeH.Location = new System.Drawing.Point(79, 34);
 			this.numericSampleDisplaySizeH.Maximum = new decimal(new int[] {
-			255,
-			0,
-			0,
-			0});
+            255,
+            0,
+            0,
+            0});
 			this.numericSampleDisplaySizeH.Minimum = new decimal(new int[] {
-			1,
-			0,
-			0,
-			0});
+            1,
+            0,
+            0,
+            0});
 			this.numericSampleDisplaySizeH.Name = "numericSampleDisplaySizeH";
 			this.numericSampleDisplaySizeH.Size = new System.Drawing.Size(48, 20);
 			this.numericSampleDisplaySizeH.TabIndex = 3;
 			this.numericSampleDisplaySizeH.Value = new decimal(new int[] {
-			1,
-			0,
-			0,
-			0});
-			this.numericSampleDisplaySizeH.ValueChanged += new System.EventHandler(this.numericSampleDisplaySizeH_ValueChanged);
-			this.numericSampleDisplaySizeH.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.numericSampleDisplaySizeH_ValueChanged);
-			this.numericSampleDisplaySizeH.Leave += new System.EventHandler(this.numericSampleDisplaySizeH_ValueChanged);
+            1,
+            0,
+            0,
+            0});
+			this.numericSampleDisplaySizeH.ValueChanged += new EventHandler(this.NumericChanged);
+			this.numericSampleDisplaySizeH.KeyPress += new KeyPressEventHandler(this.NumericChanged);
+			this.numericSampleDisplaySizeH.Leave += new EventHandler(this.NumericChanged);
 			// 
-			// label3
+			// labelSampleDisplaySize
 			// 
-			this.label3.Location = new System.Drawing.Point(16, 16);
-			this.label3.Name = "label3";
-			this.label3.Size = new System.Drawing.Size(112, 16);
-			this.label3.TabIndex = 0;
-			this.label3.Text = "Sample Display Size:";
+			this.labelSampleDisplaySize.Location = new System.Drawing.Point(16, 16);
+			this.labelSampleDisplaySize.Name = "labelSampleDisplaySize";
+			this.labelSampleDisplaySize.Size = new System.Drawing.Size(112, 16);
+			this.labelSampleDisplaySize.TabIndex = 0;
+			this.labelSampleDisplaySize.Text = "Sample Display Size:";
 			// 
 			// numericSampleDisplaySizeW
 			// 
 			this.numericSampleDisplaySizeW.Location = new System.Drawing.Point(17, 34);
 			this.numericSampleDisplaySizeW.Maximum = new decimal(new int[] {
-			255,
-			0,
-			0,
-			0});
+            255,
+            0,
+            0,
+            0});
 			this.numericSampleDisplaySizeW.Minimum = new decimal(new int[] {
-			1,
-			0,
-			0,
-			0});
+            1,
+            0,
+            0,
+            0});
 			this.numericSampleDisplaySizeW.Name = "numericSampleDisplaySizeW";
 			this.numericSampleDisplaySizeW.Size = new System.Drawing.Size(48, 20);
 			this.numericSampleDisplaySizeW.TabIndex = 1;
 			this.numericSampleDisplaySizeW.Value = new decimal(new int[] {
-			1,
-			0,
-			0,
-			0});
-			this.numericSampleDisplaySizeW.ValueChanged += new System.EventHandler(this.numericSampleDisplaySizeW_ValueChanged);
-			this.numericSampleDisplaySizeW.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.numericSampleDisplaySizeW_ValueChanged);
-			this.numericSampleDisplaySizeW.Leave += new System.EventHandler(this.numericSampleDisplaySizeW_ValueChanged);
+            1,
+            0,
+            0,
+            0});
+			this.numericSampleDisplaySizeW.ValueChanged += new EventHandler(this.NumericChanged);
+			this.numericSampleDisplaySizeW.KeyPress += new KeyPressEventHandler(this.NumericChanged);
+			this.numericSampleDisplaySizeW.Leave += new EventHandler(this.NumericChanged);
 			// 
 			// checkBoxRescanPrompt
 			// 
@@ -603,18 +556,18 @@ namespace Aural_Probe
 			// 
 			this.numericAutoplayRepeats.Location = new System.Drawing.Point(251, 62);
 			this.numericAutoplayRepeats.Minimum = new decimal(new int[] {
-			1,
-			0,
-			0,
-			0});
+            1,
+            0,
+            0,
+            0});
 			this.numericAutoplayRepeats.Name = "numericAutoplayRepeats";
 			this.numericAutoplayRepeats.Size = new System.Drawing.Size(48, 20);
 			this.numericAutoplayRepeats.TabIndex = 8;
 			this.numericAutoplayRepeats.Value = new decimal(new int[] {
-			1,
-			0,
-			0,
-			0});
+            1,
+            0,
+            0,
+            0});
 			this.numericAutoplayRepeats.ValueChanged += new System.EventHandler(this.numericAutoplayRepeats_ValueChanged);
 			this.numericAutoplayRepeats.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.numericAutoplayRepeats_ValueChanged);
 			this.numericAutoplayRepeats.Leave += new System.EventHandler(this.numericAutoplayRepeats_ValueChanged);
@@ -630,21 +583,21 @@ namespace Aural_Probe
 			this.checkBoxAutoplay.Text = "Autoplay";
 			this.checkBoxAutoplay.CheckedChanged += new System.EventHandler(this.checkBoxAutoplay_CheckedChanged);
 			// 
-			// label4
+			// labelAutoplayTimes
 			// 
-			this.label4.Location = new System.Drawing.Point(304, 65);
-			this.label4.Name = "label4";
-			this.label4.Size = new System.Drawing.Size(56, 16);
-			this.label4.TabIndex = 9;
-			this.label4.Text = "time(s)";
+			this.labelAutoplayTimes.Location = new System.Drawing.Point(304, 65);
+			this.labelAutoplayTimes.Name = "labelAutoplayTimes";
+			this.labelAutoplayTimes.Size = new System.Drawing.Size(56, 16);
+			this.labelAutoplayTimes.TabIndex = 9;
+			this.labelAutoplayTimes.Text = "time(s)";
 			// 
-			// label5
+			// labelSampleDisplaySizeX
 			// 
-			this.label5.Location = new System.Drawing.Point(66, 36);
-			this.label5.Name = "label5";
-			this.label5.Size = new System.Drawing.Size(16, 16);
-			this.label5.TabIndex = 2;
-			this.label5.Text = "x";
+			this.labelSampleDisplaySizeX.Location = new System.Drawing.Point(66, 36);
+			this.labelSampleDisplaySizeX.Name = "labelSampleDisplaySizeX";
+			this.labelSampleDisplaySizeX.Size = new System.Drawing.Size(16, 16);
+			this.labelSampleDisplaySizeX.TabIndex = 2;
+			this.labelSampleDisplaySizeX.Text = "x";
 			// 
 			// checkBoxAlwaysOnTop
 			// 
@@ -666,7 +619,7 @@ namespace Aural_Probe
 			this.checkBoxWAV.Size = new System.Drawing.Size(56, 16);
 			this.checkBoxWAV.TabIndex = 0;
 			this.checkBoxWAV.Text = "WAV";
-			this.checkBoxWAV.CheckedChanged += new System.EventHandler(this.checkBoxWAV_CheckedChanged);
+			this.checkBoxWAV.CheckedChanged += new System.EventHandler(this.FileTypeCheckBoxChanged);
 			// 
 			// checkBoxAIFF
 			// 
@@ -677,7 +630,7 @@ namespace Aural_Probe
 			this.checkBoxAIFF.Size = new System.Drawing.Size(56, 16);
 			this.checkBoxAIFF.TabIndex = 1;
 			this.checkBoxAIFF.Text = "AIFF";
-			this.checkBoxAIFF.CheckedChanged += new System.EventHandler(this.checkBoxAIFF_CheckedChanged);
+			this.checkBoxAIFF.CheckedChanged += new System.EventHandler(this.FileTypeCheckBoxChanged);
 			// 
 			// checkBoxFLAC
 			// 
@@ -688,7 +641,7 @@ namespace Aural_Probe
 			this.checkBoxFLAC.Size = new System.Drawing.Size(56, 16);
 			this.checkBoxFLAC.TabIndex = 2;
 			this.checkBoxFLAC.Text = "FLAC";
-			this.checkBoxFLAC.CheckedChanged += new System.EventHandler(this.checkBoxFLAC_CheckedChanged);
+			this.checkBoxFLAC.CheckedChanged += new System.EventHandler(this.FileTypeCheckBoxChanged);
 			// 
 			// checkBoxMP3
 			// 
@@ -699,7 +652,7 @@ namespace Aural_Probe
 			this.checkBoxMP3.Size = new System.Drawing.Size(56, 16);
 			this.checkBoxMP3.TabIndex = 3;
 			this.checkBoxMP3.Text = "MP3";
-			this.checkBoxMP3.CheckedChanged += new System.EventHandler(this.checkBoxMP3_CheckedChanged);
+			this.checkBoxMP3.CheckedChanged += new System.EventHandler(this.FileTypeCheckBoxChanged);
 			// 
 			// checkBoxWMA
 			// 
@@ -710,7 +663,7 @@ namespace Aural_Probe
 			this.checkBoxWMA.Size = new System.Drawing.Size(56, 16);
 			this.checkBoxWMA.TabIndex = 4;
 			this.checkBoxWMA.Text = "WMA";
-			this.checkBoxWMA.CheckedChanged += new System.EventHandler(this.checkBoxWMA_CheckedChanged);
+			this.checkBoxWMA.CheckedChanged += new System.EventHandler(this.FileTypeCheckBoxChanged);
 			// 
 			// checkBoxOGG
 			// 
@@ -721,33 +674,33 @@ namespace Aural_Probe
 			this.checkBoxOGG.Size = new System.Drawing.Size(56, 16);
 			this.checkBoxOGG.TabIndex = 5;
 			this.checkBoxOGG.Text = "OGG";
-			this.checkBoxOGG.CheckedChanged += new System.EventHandler(this.checkBoxOGG_CheckedChanged);
+			this.checkBoxOGG.CheckedChanged += new System.EventHandler(this.FileTypeCheckBoxChanged);
 			// 
-			// groupBox1
+			// groupFileTypes
 			// 
-			this.groupBox1.Controls.Add(this.checkBoxOGG);
-			this.groupBox1.Controls.Add(this.checkBoxMP3);
-			this.groupBox1.Controls.Add(this.checkBoxWAV);
-			this.groupBox1.Controls.Add(this.checkBoxFLAC);
-			this.groupBox1.Controls.Add(this.checkBoxWMA);
-			this.groupBox1.Controls.Add(this.checkBoxAIFF);
-			this.groupBox1.Location = new System.Drawing.Point(400, 288);
-			this.groupBox1.Name = "groupBox1";
-			this.groupBox1.Size = new System.Drawing.Size(80, 168);
-			this.groupBox1.TabIndex = 5;
-			this.groupBox1.TabStop = false;
-			this.groupBox1.Text = "File Types:";
-			this.groupBox1.Enter += new System.EventHandler(this.groupBox1_Enter);
+			this.groupFileTypes.Controls.Add(this.checkBoxOGG);
+			this.groupFileTypes.Controls.Add(this.checkBoxMP3);
+			this.groupFileTypes.Controls.Add(this.checkBoxWAV);
+			this.groupFileTypes.Controls.Add(this.checkBoxFLAC);
+			this.groupFileTypes.Controls.Add(this.checkBoxWMA);
+			this.groupFileTypes.Controls.Add(this.checkBoxAIFF);
+			this.groupFileTypes.Location = new System.Drawing.Point(400, 288);
+			this.groupFileTypes.Name = "groupFileTypes";
+			this.groupFileTypes.Size = new System.Drawing.Size(80, 168);
+			this.groupFileTypes.TabIndex = 5;
+			this.groupFileTypes.TabStop = false;
+			this.groupFileTypes.Text = "File Types:";
+			this.groupFileTypes.Enter += new System.EventHandler(this.groupBox1_Enter);
 			// 
-			// groupBox2
+			// groupFavorites
 			// 
-			this.groupBox2.Controls.Add(this.textBoxDefaultFavorites);
-			this.groupBox2.Location = new System.Drawing.Point(8, 408);
-			this.groupBox2.Name = "groupBox2";
-			this.groupBox2.Size = new System.Drawing.Size(384, 48);
-			this.groupBox2.TabIndex = 3;
-			this.groupBox2.TabStop = false;
-			this.groupBox2.Text = "Default Favorites Folder:";
+			this.groupFavorites.Controls.Add(this.textBoxDefaultFavorites);
+			this.groupFavorites.Location = new System.Drawing.Point(8, 408);
+			this.groupFavorites.Name = "groupFavorites";
+			this.groupFavorites.Size = new System.Drawing.Size(384, 48);
+			this.groupFavorites.TabIndex = 3;
+			this.groupFavorites.TabStop = false;
+			this.groupFavorites.Text = "Default Favorites Folder:";
 			// 
 			// textBoxDefaultFavorites
 			// 
@@ -757,15 +710,15 @@ namespace Aural_Probe
 			this.textBoxDefaultFavorites.TabIndex = 0;
 			this.textBoxDefaultFavorites.TextChanged += new System.EventHandler(this.textBoxDefaultFavorites_TextChanged);
 			// 
-			// groupBox3
+			// groupSoundOutput
 			// 
-			this.groupBox3.Controls.Add(this.comboOutputDevice);
-			this.groupBox3.Location = new System.Drawing.Point(8, 464);
-			this.groupBox3.Name = "groupBox3";
-			this.groupBox3.Size = new System.Drawing.Size(472, 48);
-			this.groupBox3.TabIndex = 4;
-			this.groupBox3.TabStop = false;
-			this.groupBox3.Text = "Sound Output:";
+			this.groupSoundOutput.Controls.Add(this.comboOutputDevice);
+			this.groupSoundOutput.Location = new System.Drawing.Point(8, 464);
+			this.groupSoundOutput.Name = "groupSoundOutput";
+			this.groupSoundOutput.Size = new System.Drawing.Size(472, 48);
+			this.groupSoundOutput.TabIndex = 4;
+			this.groupSoundOutput.TabStop = false;
+			this.groupSoundOutput.Text = "Sound Output:";
 			// 
 			// comboOutputDevice
 			// 
@@ -779,20 +732,20 @@ namespace Aural_Probe
 			// 
 			this.AutoScaleBaseSize = new System.Drawing.Size(5, 13);
 			this.ClientSize = new System.Drawing.Size(488, 540);
-			this.Controls.Add(this.groupBox3);
-			this.Controls.Add(this.groupBox2);
-			this.Controls.Add(this.groupBox1);
+			this.Controls.Add(this.groupSoundOutput);
+			this.Controls.Add(this.groupFavorites);
+			this.Controls.Add(this.groupFileTypes);
 			this.Controls.Add(this.groupGeneral);
 			this.Controls.Add(this.groupDirectories);
 			this.Controls.Add(this.groupCategories);
-			this.Controls.Add(this.buttonOK);
+			this.Controls.Add(this.buttonOk);
 			this.Controls.Add(this.buttonCancel);
-			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+			this.FormBorderStyle = FormBorderStyle.FixedDialog;
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
 			this.Name = "ConfigurationForm";
 			this.ShowInTaskbar = false;
-			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+			this.StartPosition = FormStartPosition.CenterParent;
 			this.Text = "Configuration";
 			this.Load += new System.EventHandler(this.InitFromConfigFile);
 			this.TextChanged += new System.EventHandler(this.OnSearchFoldersChanged);
@@ -804,32 +757,28 @@ namespace Aural_Probe
 			((System.ComponentModel.ISupportInitialize)(this.numericSampleDisplaySizeH)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.numericSampleDisplaySizeW)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.numericAutoplayRepeats)).EndInit();
-			this.groupBox1.ResumeLayout(false);
-			this.groupBox2.ResumeLayout(false);
-			this.groupBox2.PerformLayout();
-			this.groupBox3.ResumeLayout(false);
+			this.groupFileTypes.ResumeLayout(false);
+			this.groupFavorites.ResumeLayout(false);
+			this.groupFavorites.PerformLayout();
+			this.groupSoundOutput.ResumeLayout(false);
 			this.ResumeLayout(false);
 
 		}
 		#endregion
 
-		private void button1_Click(object sender, System.EventArgs e)
+		private void button1_Click(object sender, EventArgs e)
 		{
 			this.DialogResult = DialogResult.Cancel;
 			this.Close();
 		}
 
-		private void textBox1_TextChanged(object sender, System.EventArgs e)
+		private void buttonOK_Click(object sender, EventArgs e)
 		{
-		}
-
-		private void buttonOK_Click(object sender, System.EventArgs e)
-		{
-			if (this.bNeedToRescanFolders)
+			if (this.needToRescanFolders)
 			{
 				this.DialogResult = DialogResult.Retry;
 			}
-			else if (this.bDataDirty)
+			else if (this.dataIsDirty)
 			{
 				this.DialogResult = DialogResult.OK;
 			}
@@ -842,7 +791,47 @@ namespace Aural_Probe
 			this.Close();
 		}
 
-		private void buttonInsert_Click(object sender, System.EventArgs e)
+		private static void ValidateRegex(string regex)
+		{
+			try
+			{
+				// ReSharper disable once ReturnValueOfPureMethodIsNotUsed
+				// Just checking if it's valid regex
+				new Regex(regex).Match("test");
+			}
+			catch (ArgumentException)
+			{
+				MessageBox.Show("Invalid regular expression. Please see the documentation for regular expression syntax.", "Warning!", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+			}
+		}
+
+//==================== DECONTAMINATED ZONE, START ==================================================
+
+		private static Category CreateCategory(
+			string name,
+			string wildcard,
+			bool useRegex
+		) {
+			return new Category {
+				Name = name,
+				SearchStrings = useRegex
+					? new List<string> { wildcard }
+					: wildcard
+						.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+						.ToList(),
+				UseRegex = useRegex,
+				Regex = useRegex ? wildcard : null
+			};
+		}
+
+		private void EmptyCategoryCreationControls()
+		{
+			this.textName.Text = "";
+			this.textWildcard.Text = "";
+			this.checkBoxUseRegularExpressions.Checked = false;
+		}
+
+		private void buttonInsert_Click(object sender, EventArgs e)
 		{
 			var name = this.textName.Text;
 			var wildcard = this.textWildcard.Text;
@@ -850,326 +839,211 @@ namespace Aural_Probe
 
 			if (useRegularExpressions)
 			{
-				try
-				{
-					var r = new Regex(wildcard);
-					var m = r.Match("Test");
-				}
-				catch (ArgumentException)
-				{
-					MessageBox.Show("Invalid regular expression. Please see the documentation for regular expression syntax.", "Warning!", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-					return;
-				}
+				ValidateRegex(wildcard);
 			}
 
 			if (name.Length > 0)
 			{
-				categoryName[lnNumCategories] = name;
-				categoryUseRegularExpressions[lnNumCategories] = useRegularExpressions;
-				if (useRegularExpressions)
-				{
-					categorySearchStrings[lnNumCategories, 0] = wildcard;
-					lnNumCategorySearchStrings[lnNumCategories] = 1;
-				}
-				else 
-				{
-					var delimStr = ",;";
-					var delimiter = delimStr.ToCharArray();
-					string[] split = null;
-					split = wildcard.Split(delimiter, ConfigFile.MaxSearchStringsPerCategory);
-					var i = 0;
-					foreach (var s in split)
-					{
-						if (s.Length > 0)
-						{
-							categorySearchStrings[lnNumCategories, i] = s;
-							i++;
-						}
-					}
-					lnNumCategorySearchStrings[lnNumCategories] = i;
-				}
-				textName.Text = "";
-				textWildcard.Text = "";
-				checkBoxUseRegularExpressions.Checked = false;
+				var category = CreateCategory(name, wildcard, useRegularExpressions);
+				this.configFile.Categories.Add(category);
 
-				var categoryListName = "";
-				categoryListName += categoryName[lnNumCategories] + "\t";
-				for (int j = 0, k = lnNumCategorySearchStrings[lnNumCategories]; j < k; j++)
-				{
-					categorySearchStrings[lnNumCategories, j] = categorySearchStrings[lnNumCategories, j];
-					categoryListName += categorySearchStrings[lnNumCategories, j];
-					if (j < k - 1)
-						categoryListName += ",";
-				}
-				listCategories.Items.Add(categoryListName);
-				
-				lnNumCategories++;
+				this.EmptyCategoryCreationControls();
+
+				//this.listCategories.Items.Add(GetCategoryListName(category));
+				this.UpdateCategoryList();
 			}
 
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
 		}
 
-		private void buttonDelete_Click(object sender, System.EventArgs e)
+		private void buttonDelete_Click(object sender, EventArgs e)
 		{
 			// Delete selected item from list!
-			var index = listCategories.SelectedIndex;
-			if (index > 0)
-			{
-				listCategories.Items.RemoveAt(index);
-				lnNumCategorySearchStrings[index] = 0;
-				lnNumCategories--;
-				for (var i = index; i < lnNumCategories; i++)
-				{
-					lnNumCategorySearchStrings[i] = lnNumCategorySearchStrings[i+1];
-					for (var j = 0; j < ConfigFile.MaxSearchStringsPerCategory; ++j)
-						categorySearchStrings[i,j] = categorySearchStrings[i+1,j];
-					categoryName[i] = categoryName[i+1];
-					categoryUseRegularExpressions[i] = categoryUseRegularExpressions[i + 1];
-				}
-			}
+			this.configFile.Categories.RemoveAt(this.listCategories.SelectedIndex);
+			this.UpdateCategoryList();
 
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
 		}
 
-		private void OnSearchFoldersChanged(object sender, System.EventArgs e)
+		private void OnSearchFoldersChanged(object sender, EventArgs e)
 		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
 		}
 
-		private void OnSampleSizeChanged(object sender, System.EventArgs e)
+		private void groupCategories_Enter(object sender, EventArgs e)
 		{
-			bDataDirty = true;
 		}
 
-		private void groupCategories_Enter(object sender, System.EventArgs e)
-		{
-		
-		}
-
-		private void buttonReplace_Click(object sender, System.EventArgs e)
+		private void buttonReplace_Click(object sender, EventArgs e)
 		{
 			// Replace selected item in list!
-			var index = listCategories.SelectedIndex;
-			if (index <= 0)
-				return; // should never get here
+			var index = this.listCategories.SelectedIndex;
 
-			var name = textName.Text.ToString();
-			var wildcard = textWildcard.Text.ToString();
-			var useRegularExpressions = checkBoxUseRegularExpressions.Checked;
+			if (index <= 0)
+			{
+				return; // should never get here
+			}
+
+			var name = this.textName.Text;
+			var wildcard = this.textWildcard.Text;
+			var useRegularExpressions = this.checkBoxUseRegularExpressions.Checked;
 
 			if (useRegularExpressions)
 			{
-				try
-				{
-					var r = new Regex(wildcard);
-					var m = r.Match("Test");
-				}
-				catch (ArgumentException)
-				{
-					MessageBox.Show("Invalid regular expression. Please see the documentation for regular expression syntax.", "Warning!", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-					return;
-				}
+				ValidateRegex(wildcard);
 			}
 
 			if (name.Length > 0)
 			{
-				categoryName[index] = name;
-				categoryUseRegularExpressions[index] = useRegularExpressions;
-				if (useRegularExpressions)
-				{
-					categorySearchStrings[index, 0] = wildcard;
-					lnNumCategorySearchStrings[index] = 1;
-				}
-				else
-				{
-					var delimStr = ",;";
-					var delimiter = delimStr.ToCharArray();
-					string[] split = null;
-					split = wildcard.Split(delimiter, ConfigFile.MaxSearchStringsPerCategory);
-					var i = 0;
-					foreach (var s in split)
-					{
-						if (s.Length > 0)
-						{
-							categorySearchStrings[index, i] = s;
-							i++;
-						}
-					}
-					lnNumCategorySearchStrings[index] = i;
-				}
-				textName.Text = "";
-				textWildcard.Text = "";
-				checkBoxUseRegularExpressions.Checked = false;
+				var category = CreateCategory(name, wildcard, useRegularExpressions);
+				this.configFile.Categories[index] = category;
 
-				var categoryListName = "";
-				categoryListName += categoryName[index] + "\t";
-				for (int j = 0, k = lnNumCategorySearchStrings[index]; j < k; j++)
-				{
-					categorySearchStrings[index, j] = categorySearchStrings[index, j];
-					categoryListName += categorySearchStrings[index, j];
-					if (j < k - 1)
-						categoryListName += ",";
-				}
-				listCategories.Items[index] = ""; // clear the value before setting it, otherwise it won't update for case changes (eg. a to A)
-				listCategories.Items[index] = categoryListName;
+				this.textName.Text = "";
+				this.textWildcard.Text = "";
+				this.checkBoxUseRegularExpressions.Checked = false;
+
+				this.listCategories.Items[index] = ""; // clear the value before setting it, otherwise it won't update for case changes (eg. a to A)
+				this.listCategories.Items[index] = GetCategoryListName(category);
 			}
 
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
 		}
 
-		private void listCategories_SelectedIndexChanged(object sender, System.EventArgs e)
+		private void listCategories_SelectedIndexChanged(object sender, EventArgs e)
 		{
 			// Replace selected item in list!
-			var index = listCategories.SelectedIndex;
+			var index = this.listCategories.SelectedIndex;
 			if (index == -1)
 				return; // should never get here
 
 			// disable replace/delete buttons for All Samples and don't copy text to edit fields
-			buttonReplace.Enabled = index != 0;
-			buttonDelete.Enabled = index != 0;
-			buttonMoveUp.Enabled = index > 1;
-			buttonMoveDown.Enabled = index > 0 && index < listCategories.Items.Count - 1;
+			this.buttonReplace.Enabled = index != 0;
+			this.buttonDelete.Enabled = index != 0;
+			this.buttonMoveUp.Enabled = index > 1;
+			this.buttonMoveDown.Enabled = index > 0 && index < this.listCategories.Items.Count - 1;
 
 			if (index == 0)
 			{
-				textName.Text = "";
-				textWildcard.Text = "";
-				checkBoxUseRegularExpressions.Checked = false;
+				this.textName.Text = "";
+				this.textWildcard.Text = "";
+				this.checkBoxUseRegularExpressions.Checked = false;
 				return;
 			}
 
-			var wildcard = "";
-			for (int j = 0, k = lnNumCategorySearchStrings[index]; j < k; j++)
+			this.textName.Text = this.configFile.Categories[index].Name;
+			this.textWildcard.Text = string.Join(",", this.configFile.Categories[index].SearchStrings);
+			this.checkBoxUseRegularExpressions.Checked = this.configFile.Categories[index].UseRegex;
+		}
+
+		private void groupBox1_Enter(object sender, EventArgs e)
+		{
+		}
+
+		private void textBoxDefaultFavorites_TextChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+		}
+
+		private void numericAutoplayRepeats_ValueChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+		}
+
+		private void FileTypeCheckBoxChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
+			this.UpdateCheckboxes();
+		}
+
+		private void UpdateCheckboxes()
+		{
+			if (this.loading)
 			{
-				wildcard += categorySearchStrings[index, j];
-				if (j < k - 1)
-					wildcard += ",";
+				return;
 			}
 
-			textName.Text = categoryName[index];
-			textWildcard.Text = wildcard;
-			checkBoxUseRegularExpressions.Checked = categoryUseRegularExpressions[index];
+			this.configFile.RescanPrompt = this.checkBoxRescanPrompt.Checked;
+			this.configFile.IncludeFilePaths = this.checkBoxIncludeFilePaths.Checked;
+			this.configFile.Autoplay = this.checkBoxAutoplay.Checked;
+			this.configFile.AlwaysOnTop = this.checkBoxAlwaysOnTop.Checked;
+
+			this.configFile.LoadWav = this.checkBoxWAV.Checked;
+			this.configFile.LoadAiff = this.checkBoxAIFF.Checked;
+			this.configFile.LoadFlac = this.checkBoxFLAC.Checked;
+			this.configFile.LoadMp3 = this.checkBoxMP3.Checked;
+			this.configFile.LoadWma = this.checkBoxWMA.Checked;
+			this.configFile.LoadOgg = this.checkBoxOGG.Checked;
 		}
 
-		private void OnSampleSizeKeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
+		private void UpdateCategoryList()
 		{
-			OnSampleSizeChanged(sender, e);
-		}
+			var selectedIndex = this.CategoryIndex;
 
-		private void checkBoxRescanPrompt_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void checkBoxIncludeFilePaths_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
-		}
-
-		private void groupBox1_Enter(object sender, System.EventArgs e)
-		{
-		
-		}
-
-		private void textBoxDefaultFavorites_TextChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void checkBoxAutoplay_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			numericAutoplayRepeats.Enabled = checkBoxAutoplay.Checked;
-		}
-
-		private void numericAutoplayRepeats_ValueChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void checkBoxWAV_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
-		}
-
-		private void checkBoxAIFF_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
-		}
-
-		private void checkBoxFLAC_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
-		}
-
-		private void checkBoxMP3_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
-		}
-
-		private void checkBoxWMA_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
-		}
-
-		private void checkBoxOGG_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void numericSampleDisplaySizeW_ValueChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void checkBoxAlwaysOnTop_CheckedChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void comboOutputDevice_SelectedIndexChanged(object sender, System.EventArgs e)
-		{
-			ChangeSoundOutput();
-			bDataDirty = true;
-		}
-
-		private void numericSampleDisplaySizeH_ValueChanged(object sender, System.Windows.Forms.KeyPressEventArgs e)
-		{
-		
-		}
-
-		private void numericAutoplayRepeats_ValueChanged(object sender, System.Windows.Forms.KeyPressEventArgs e)
-		{
-		
-		}
-
-		private void numericSampleDisplaySizeH_ValueChanged(object sender, System.EventArgs e)
-		{
-			bDataDirty = true;
-		}
-
-		private void numericSampleDisplaySizeW_ValueChanged(object sender, System.Windows.Forms.KeyPressEventArgs e)
-		{
-		
-		}
-
-		private void textDirectories_KeyDown(object sender, KeyEventArgs e)
-		{
-			if (e.Control && e.KeyCode == Keys.A)
+			this.listCategories.Items.Clear();
+			foreach (var category in this.configFile.Categories)
 			{
-				((TextBox)sender).SelectAll();
-				e.Handled = true;
+				this.listCategories.Items.Add(GetCategoryListName(category));
 			}
+
+			// Restore selected item
+			this.listCategories.SelectedIndex = selectedIndex;
+		}
+
+		private void NumericChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+			this.UpdateNumerics();
+		}
+
+		private void UpdateNumerics()
+		{
+			if (this.loading)
+			{
+				return;
+			}
+
+			this.configFile.SampleDisplaySizeW = (int)this.numericSampleDisplaySizeW.Value;
+			this.configFile.SampleDisplaySizeH = (int)this.numericSampleDisplaySizeH.Value;
+			this.configFile.AutoplayRepeats = (int)this.numericAutoplayRepeats.Value;
+		}
+
+//==================== DECONTAMINATED ZONE, END ====================================================
+
+		private void checkBoxAlwaysOnTop_CheckedChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+			this.UpdateCheckboxes();
+		}
+
+		private void checkBoxRescanPrompt_CheckedChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+			this.UpdateCheckboxes();
+		}
+
+		private void checkBoxIncludeFilePaths_CheckedChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
+			this.UpdateCheckboxes();
+		}
+
+		private void checkBoxAutoplay_CheckedChanged(object sender, EventArgs e)
+		{
+			this.dataIsDirty = true;
+			this.numericAutoplayRepeats.Enabled = this.checkBoxAutoplay.Checked;
+			this.UpdateCheckboxes();
+		}
+
+		private void comboOutputDevice_SelectedIndexChanged(object sender, EventArgs e)
+		{
+			this.ChangeSoundOutput();
+			this.dataIsDirty = true;
 		}
 
 		private void linkLabelUseRegularExpressionsHelp_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -1177,47 +1051,44 @@ namespace Aural_Probe
 			System.Diagnostics.Process.Start("https://msdn.microsoft.com/en-us/library/az24scfc%28v=vs.110%29.aspx");
 		}
 
-		public static void Swap<T>(ref T lhs, ref T rhs)
-		{
-			var temp = lhs;
-			lhs = rhs;
-			rhs = temp;
-		}
-
-		private void buttonMove(bool bUp)
+		private void ButtonMove(bool bUp)
 		{
 			// Move selected item in list up or down one
-			var index = listCategories.SelectedIndex;
+			var index = this.listCategories.SelectedIndex;
+
 			if (bUp && index <= 1)
+			{
 				return; // should never get here
-			if (!bUp && index >= listCategories.Items.Count - 1)
+			}
+
+			if (!bUp && index >= this.listCategories.Items.Count - 1)
+			{
 				return; // should never get here
+			}
 
 			var targetIndex = bUp ? index - 1 : index + 1;
+			var bottomIndex = Math.Min(index, targetIndex);
+			var topIndex = Math.Max(index, targetIndex);
+			var bottomCategory = this.configFile.Categories[bottomIndex];
+			this.configFile.Categories.RemoveAt(bottomIndex);
+			this.configFile.Categories.Insert(topIndex, bottomCategory);
 
-			Swap(ref categoryName[targetIndex], ref categoryName[index]);
-			Swap(ref categoryUseRegularExpressions[targetIndex], ref categoryUseRegularExpressions[index]);
-			for (var i = 0; i < ConfigFile.MaxSearchStringsPerCategory; ++i)
-				Swap(ref categorySearchStrings[targetIndex, i], ref categorySearchStrings[index, i]);
-			Swap(ref lnNumCategorySearchStrings[targetIndex], ref lnNumCategorySearchStrings[index]);
+			this.listCategories.SelectedIndex = targetIndex;
 
-			var tmp = (string)listCategories.Items[targetIndex];
-			listCategories.Items[targetIndex] = listCategories.Items[index]; // clear the value before setting it, otherwise it won't update for case changes (eg. a to A)
-			listCategories.Items[index] = tmp;
+			this.UpdateCategoryList();
 
-			listCategories.SelectedIndex = targetIndex;
-
-			bDataDirty = true;
-			bNeedToRescanFolders = true;
+			this.dataIsDirty = true;
+			this.needToRescanFolders = true;
 		}
+
 		private void buttonMoveUp_Click(object sender, EventArgs e)
 		{
-			buttonMove(true);
+			this.ButtonMove(true);
 		}
 
 		private void buttonMoveDown_Click(object sender, EventArgs e)
 		{
-			buttonMove(false);
+			this.ButtonMove(false);
 		}
 	}
 }

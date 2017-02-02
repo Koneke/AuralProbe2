@@ -16,6 +16,7 @@ namespace Aural_Probe
 		public string Name;
 		public List<string> SearchStrings;
 		public bool UseRegex;
+		public string Regex;
 	}
 
 	public class Library
