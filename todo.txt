@@ -1,5 +1,7 @@
-- do *something*, preferably something violent, to ScanFoldersProcess.cs
-- just keep decoupling/structuring things
-- stop handling the sample library with arrays
+- do *something*, preferably something violent, to ScanFoldersProcess.cs (unfucking)
+- just keep decoupling/structuring things (unfucking)
+- stop handling the sample library with arrays (unfucking)
   - actual sample class
   - lists and other not-as-dumb things
+- update category list when we hit the favourite button (new-bug fix)
+- change the stop button to play when a sample has finished playing (original-bug fix)

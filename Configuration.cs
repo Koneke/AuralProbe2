@@ -205,7 +205,7 @@ namespace Aural_Probe
 				this.configFile.DefaultSoundDevice = this.comboOutputDevice.Text;
 
 				this.configFile.Save();
-				MainForm.app.Files.configFile = this.configFile;
+				MainForm.app.Files.ConfigFile = this.configFile;
 
 				this.dataIsDirty = false;
 			}

@@ -18,33 +18,32 @@ namespace Aural_Probe
 		private StatusBar statusBar;
 		public StatusBarPanel statusBarPanel;
 
-		public static FMOD.Sound sound  = null;
-		private FMOD.Channel channel = null;
-		public bool bAutoPlayNextSample = false;
-		public int nAutoPlayRepeatsLeft = 0;
+		public static FMOD.Sound sound;
+		private FMOD.Channel channel;
+		private bool bAutoPlayNextSample;
+		private int nAutoPlayRepeatsLeft;
 		private FMOD.CHANNEL_CALLBACK cbFMOD = null;
 
-		private PersistWindowState m_windowState;
-		
-		public static string kSampleCacheFilename = "cache.dat";
-		public const int kVersionedSampleCacheID = 1;
+		private PersistWindowState windowState;
 
-		public static ConfigFile configFile => app.Files.configFile;
+		private const string SampleCacheFilename = "cache.dat";
+		private const int VersionedSampleCacheID = 1;
+
+		public static ConfigFile configFile => app.Files.ConfigFile;
 		
 		public static int knMaxColors = 16;
 		public int nColorInc;
 
-		public bool bUseCachedSamplesIfPossible;
+		private bool bUseCachedSamplesIfPossible;
 
-		public string forceLoadFavoritesName = "";
+		private string forceLoadFavoritesName = "";
 		public int lnSamples;
-		public bool lbDontPlayNextSample;
+		private bool lbDontPlayNextSample;
 		public string[] sampleList => app.Library.sampleList;
 		public int[] sampleColorIndex => app.Library.sampleColorIndex;
 		public int[,] sampleIndices => app.Library.sampleIndices;
 		public int[] sampleIndicesCount => app.Library.sampleIndicesCount;
-		public int[] sampleFavoritesCount => app.Library.sampleFavoritesCount;
-		public int[] sampleBitField => app.Library.sampleBitField;
+		private int[] sampleBitField => app.Library.sampleBitField;
 
 		private ToolBarButton toolBarButtonLoadFavorites;
 		private ToolBarButton toolBarButtonSaveFavorites;
@@ -61,17 +60,17 @@ namespace Aural_Probe
 		private MenuItem menuItem1;
 		private MenuItem menuItem2;
 
-		int bitFavorite = 0;
-		int bitMissing = 1;
+		private const int BitFavorite = 0;
+		private const int BitMissing = 1;
 
-		public int listSamplesSingleSelectedIndex; // when there are multiple selections, this is -1, otherwise it's listSamples.SelectedIndex
-		public int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
+		private int listSamplesSingleSelectedIndex; // when there are multiple selections, this is -1, otherwise it's listSamples.SelectedIndex
+		private int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
 
 		public static App app;
-		public static string workingDirectory => app.Files.workingDirectory;
+		public static string workingDirectory => app.Files.WorkingDirectory;
 
-		public bool lbFavoritesOnly;
-		public bool lbDirtyFavorites;
+		private bool lbFavoritesOnly;
+		private bool lbDirtyFavorites;
 
 		public ConfigurationForm configurationForm;
 		public AboutForm aboutForm;
@@ -95,32 +94,32 @@ namespace Aural_Probe
 		private ToolBarButton toolBarButtonFavoritesOnly;
 		private SplitContainer splitContainer2;
 		private SplitContainer splitContainer1;
-		public ListBox tagsList;
+		private ListBox tagsList;
 		public ContextMenu sampleListMenu;  
 
 		public MainForm()
 		{
 			// Required for Windows Form Designer support
-			InitializeComponent();
+			this.InitializeComponent();
 
-			m_windowState = new PersistWindowState(this);
-			m_windowState.Parent = this;
-			m_windowState.RegistryPath = @"Software\Aural Probe"; 
+			this.windowState = new PersistWindowState(this);
+			this.windowState.Parent = this;
+			this.windowState.RegistryPath = @"Software\Aural Probe"; 
 
 			try
 			{
 				app = new App(this);
 				app.foo(this); // what the fuck why can't I just put this in the ctor of App? haha
 
-				UpdateFormWithConfigurationData();
-				Show();
-				Refresh();
+				this.UpdateFormWithConfigurationData();
+				this.Show();
+				this.Refresh();
 
-				RefreshForm();
+				this.RefreshForm();
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("MainForm::MainForm " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);				
+				MessageBox.Show("MainForm::MainForm " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);				
 			}
 			return;
 		}
@@ -129,7 +128,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (lnSamples == 0 && file.bLoaded)
+				if (this.lnSamples == 0 && file.bLoaded)
 				{
 					if (bShowWarning)
 					{
@@ -143,36 +142,36 @@ namespace Aural_Probe
 					return false;
 				}
 
-				bool bError = false;
-				string errorMessage = "The following favorites could not be located:\n\n";
+				var bError = false;
+				var errorMessage = "The following favorites could not be located:\n\n";
 
-				for (int i = 0; i < lnSamples; ++i)
+				for (var i = 0; i < this.lnSamples; ++i)
 				{
-					app.SetSampleFlag(i, bitFavorite, false);
+					app.SetSampleFlag(i, BitFavorite, false);
 				}
 
-				for (int i = 0; i < file.nFavorites; ++i)
+				for (var i = 0; i < file.nFavorites; ++i)
 				{
 					// See if we can quickly find favorite
-					if (file.favoriteIndex[i] < lnSamples && file.favoriteName[i] == sampleList[file.favoriteIndex[i]])
+					if (file.favoriteIndex[i] < this.lnSamples && file.favoriteName[i] == this.sampleList[file.favoriteIndex[i]])
 					{
 						// we have a winner!
-						app.SetSampleFlag(file.favoriteIndex[i], bitFavorite, true);
+						app.SetSampleFlag(file.favoriteIndex[i], BitFavorite, true);
 					}
 					else
 					{
 						// we have to find it manually as the index is a dud
-						int j = 0;
-						for (; j < lnSamples; ++j)
+						var j = 0;
+						for (; j < this.lnSamples; ++j)
 						{
-							if (sampleList[j] == file.favoriteName[i])
+							if (this.sampleList[j] == file.favoriteName[i])
 							{
 								// we found it!
-								app.SetSampleFlag(file.favoriteIndex[i], bitFavorite, true);
+								app.SetSampleFlag(file.favoriteIndex[i], BitFavorite, true);
 								break;
 							}
 						}
-						if (j == lnSamples) // we didn't find it!
+						if (j == this.lnSamples) // we didn't find it!
 						{
 							errorMessage += file.favoriteName[i] + "\n";
 							bError = true;
@@ -192,9 +191,9 @@ namespace Aural_Probe
 
 				return true;
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("UpdateFavoriteDataFromFavoritesFile " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
+				MessageBox.Show("UpdateFavoriteDataFromFavoritesFile " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 				return false;
 			}
 		}
@@ -203,7 +202,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (sampleFavoritesCount[0] == 0)
+				if (app.Library.sampleFavoritesCount[0] == 0)
 				{
 					if (bShowWarning)
 					{
@@ -217,22 +216,22 @@ namespace Aural_Probe
 					return;
 				}
 
-				file.Reset(sampleFavoritesCount[0]);
-				int favoriteIndex = 0;
+				file.Reset(app.Library.sampleFavoritesCount[0]);
+				var favoriteIndex = 0;
 
-				for (int i = 0; i < lnSamples; ++i)
+				for (var i = 0; i < this.lnSamples; ++i)
 				{
-					if (app.GetSampleFlag(i, bitFavorite))
+					if (app.GetSampleFlag(i, BitFavorite))
 					{
 						file.favoriteIndex[favoriteIndex] = i;
-						file.favoriteName[favoriteIndex] = sampleList[i];
+						file.favoriteName[favoriteIndex] = this.sampleList[i];
 						favoriteIndex++;
 					}
 				}
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("UpdateFavoritesFileFromFavoriteData " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
+				MessageBox.Show("UpdateFavoritesFileFromFavoriteData " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
 		}
 
@@ -240,25 +239,28 @@ namespace Aural_Probe
 		{
 			try
 			{
-				for (int i = 0; i < configFile.Categories.Count; ++i)
+				app.Library.UpdateFavoriteCounts();
+
+				for (var i = 0; i < configFile.Categories.Count; ++i)
 				{
-					sampleFavoritesCount[i] = 0;
-					for (int j = 0; j < sampleIndicesCount[i]; ++j)
+					app.Library.sampleFavoritesCount[i] = 0;
+
+					for (var j = 0; j < this.sampleIndicesCount[i]; ++j)
 					{
-						int index = sampleIndices[i,j];
-						if (app.GetSampleFlag(index, bitFavorite))
+						var index = this.sampleIndices[i,j];
+						if (app.GetSampleFlag(index, BitFavorite))
 						{
-							sampleFavoritesCount[i]++;
+							app.Library.sampleFavoritesCount[i]++;
 						}
 					}
 				}
 
-				UpdateTitleBarText();
-				UpdateCategoryList();
+				this.UpdateTitleBarText();
+				this.UpdateCategoryList();
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("UpdateSampleFavorites " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("UpdateSampleFavorites " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 		
@@ -266,10 +268,10 @@ namespace Aural_Probe
 		{
 			try
 			{
-				string title = "Aural Probe";
-				string[] splitFilename = app.Files.favoritesFile.currentFavoritesFilename.Split('\\');
+				var title = "Aural Probe";
+				var splitFilename = app.Files.FavoritesFile.currentFavoritesFilename.Split('\\');
 
-				if (app.Files.favoritesFile.bLoaded)
+				if (app.Files.FavoritesFile.bLoaded)
 				{
 					title += " - " + splitFilename[splitFilename.Length-1];
 				}
@@ -278,16 +280,16 @@ namespace Aural_Probe
 					title += " - Untitled";
 				}
 
-				if (lbDirtyFavorites && sampleFavoritesCount[0] > 0)
+				if (this.lbDirtyFavorites)
 				{
 					title += "*";
 				}
 
-				Text = title;
+				this.Text = title;
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("UpdateTitleBarText " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
+				MessageBox.Show("UpdateTitleBarText " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
 		}
 
@@ -295,39 +297,39 @@ namespace Aural_Probe
 		{
 			try
 			{
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+				var nCurrentCategory = this.categoriesList.SelectedIndex;
+				if (nCurrentCategory < 0 || this.sampleIndicesCount[nCurrentCategory] == 0)
 					return;
-				int nCount = sampleIndicesCount[nCurrentCategory];
-				listSamples.Items.Clear();
-				for (int i = 0; i < nCount; ++i)
+				var nCount = this.sampleIndicesCount[nCurrentCategory];
+				this.listSamples.Items.Clear();
+				for (var i = 0; i < nCount; ++i)
 				{
-					int nSampleIndex = sampleIndices[nCurrentCategory, i];
-					if (!lbFavoritesOnly || app.GetSampleFlag(nSampleIndex, bitFavorite))
+					var nSampleIndex = this.sampleIndices[nCurrentCategory, i];
+					if (!this.lbFavoritesOnly || app.GetSampleFlag(nSampleIndex, BitFavorite))
 					{
-						listSamples.Items.Add(i.ToString());
+						this.listSamples.Items.Add(i.ToString());
 					}
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("UpdateAudioSamples " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
+				MessageBox.Show("UpdateAudioSamples " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
 		}
 
-		public void UpdateCategoryList()
+		private void UpdateCategoryList()
 		{
 			try
 			{
-				if (lbFavoritesOnly)
+				if (this.lbFavoritesOnly)
 				{
-					for (int i = 0; i < configFile.Categories.Count; ++i)
-						categoriesList.Items[i] = app.GetCategoryListName(i);
+					for (var i = 0; i < configFile.Categories.Count; ++i)
+						this.categoriesList.Items[i] = app.GetCategoryListName(i);
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("UpdateCategoryList " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
+				MessageBox.Show("UpdateCategoryList " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
 		}
 
@@ -335,51 +337,51 @@ namespace Aural_Probe
 		{
 			try
 			{
-				TopMost = configFile.AlwaysOnTop;
+				this.TopMost = configFile.AlwaysOnTop;
 
-				bAutoPlayNextSample = false; // this gets set when playing a sound
-				nAutoPlayRepeatsLeft = 0; // this gets set when playing a sound
+				this.bAutoPlayNextSample = false; // this gets set when playing a sound
+				this.nAutoPlayRepeatsLeft = 0; // this gets set when playing a sound
 
 				// Update the category list
-				int oldIndex = categoriesList.SelectedIndex;
-				int oldCategoriesSize = categoriesList.Items.Count;
+				var oldIndex = this.categoriesList.SelectedIndex;
+				var oldCategoriesSize = this.categoriesList.Items.Count;
 
-				categoriesList.Items.Clear();
-				for (int i = 0; i < configFile.Categories.Count; ++i)
-					categoriesList.Items.Add(app.GetCategoryListName(i));
+				this.categoriesList.Items.Clear();
+				for (var i = 0; i < configFile.Categories.Count; ++i)
+					this.categoriesList.Items.Add(app.GetCategoryListName(i));
 
-				if (oldCategoriesSize == categoriesList.Items.Count)
-					categoriesList.SelectedIndex = oldIndex;
+				if (oldCategoriesSize == this.categoriesList.Items.Count)
+					this.categoriesList.SelectedIndex = oldIndex;
 
-				UpdateStatusBarAndLabel();
-				listSamples.ItemHeight = configFile.SampleDisplaySizeH;
-				listSamples.ColumnWidth = configFile.SampleDisplaySizeW;
+				this.UpdateStatusBarAndLabel();
+				this.listSamples.ItemHeight = configFile.SampleDisplaySizeH;
+				this.listSamples.ColumnWidth = configFile.SampleDisplaySizeW;
 
 				//sampleListMenu.MenuItems[3].Enabled = !lbFavoritesOnly; // disable favorite editing when in favorites view
 
-				UpdateVolume();
+				this.UpdateVolume();
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("UpdateFormWithConfigurationData " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("UpdateFormWithConfigurationData " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
 		public void UpdateVolume()
 		{
-			float volumePercentage = trackBarMasterVol.Value / 100.0f;
+			var volumePercentage = this.trackBarMasterVol.Value / 100.0f;
 
 			if (volumePercentage <= 0f)
 			{
-				labelVolumeValue.Text = "Off";
+				this.labelVolumeValue.Text = "Off";
 			}
 			else
 			{
-				labelVolumeValue.Text = (20f * Math.Log10(volumePercentage)).ToString("F1") + " dB";
+				this.labelVolumeValue.Text = (20f * Math.Log10(volumePercentage)).ToString("F1") + " dB";
 			}
 
 			FMOD.ChannelGroup group = null;
-			FMOD.RESULT result = app.fmodManager.systemFMOD.getMasterChannelGroup(ref group);
+			var result = app.fmodManager.SystemFmod.getMasterChannelGroup(ref group);
 			group.setVolume(volumePercentage);
 
 		}
@@ -388,52 +390,54 @@ namespace Aural_Probe
 		{
 			try
 			{
-				listSamples.Items.Clear();
-				statusBarPanel.ToolTipText = "";
+				this.listSamples.Items.Clear();
+				this.statusBarPanel.ToolTipText = "";
 			
 				if (configFile.SearchDirectories.Count <= 0)
 				{
-					pictureStatus.Visible = true;
-					statusLabel.Visible = true;
-					statusLabel.Text = "You must configure your search folders.";
-					statusBarPanel.Text = "Ready";
-					statusBarProperties.Text = "";
+					this.pictureStatus.Visible = true;
+					this.statusLabel.Visible = true;
+					this.statusLabel.Text = "You must configure your search folders.";
+					this.statusBarPanel.Text = "Ready";
+					this.statusBarProperties.Text = "";
 				}
 				else if (configFile.Categories.Count <= 0)
 				{
-					pictureStatus.Visible = true;
-					statusLabel.Visible = true;
-					statusLabel.Text = "You must configure your audio sample categories.";
-					statusBarPanel.Text = "No categories found";
-					statusBarProperties.Text = "";
+					this.pictureStatus.Visible = true;
+					this.statusLabel.Visible = true;
+					this.statusLabel.Text = "You must configure your audio sample categories.";
+					this.statusBarPanel.Text = "No categories found";
+					this.statusBarProperties.Text = "";
 				}
-				else if (lnSamples <= 0)
+				else if (this.lnSamples <= 0)
 				{
-					pictureStatus.Visible = true;
-					statusLabel.Visible = true;
-					statusLabel.Text = "No audio samples found.";
-					statusBarPanel.Text = "No audio samples found";
-					statusBarProperties.Text = "";
+					this.pictureStatus.Visible = true;
+					this.statusLabel.Visible = true;
+					this.statusLabel.Text = "No audio samples found.";
+					this.statusBarPanel.Text = "No audio samples found";
+					this.statusBarProperties.Text = "";
 				}
-				else if (categoriesList.SelectedIndex == -1)
+				else if (this.categoriesList.SelectedIndex == -1)
 				{
-					pictureStatus.Visible = true;
-					statusLabel.Visible = true;
-					statusLabel.Text = "Select a category from the left.";
-					statusBarPanel.Text = lnSamples.ToString() + " sample(s)";
-					statusBarProperties.Text = "";
+					this.pictureStatus.Visible = true;
+					this.statusLabel.Visible = true;
+					this.statusLabel.Text = "Select a category from the left.";
+					this.statusBarPanel.Text = this.lnSamples + " sample(s)";
+					this.statusBarProperties.Text = "";
 				}
 				else
 				{
-					pictureStatus.Visible = false;
-					statusLabel.Visible = false;
-					statusBarPanel.Text = (lbFavoritesOnly ? sampleFavoritesCount[categoriesList.SelectedIndex] : sampleIndicesCount[categoriesList.SelectedIndex]).ToString() + "/" + lnSamples.ToString() + " sample(s)";
-					statusBarProperties.Text = "";
+					this.pictureStatus.Visible = false;
+					this.statusLabel.Visible = false;
+					this.statusBarPanel.Text = (this.lbFavoritesOnly
+						? app.Library.sampleFavoritesCount[this.categoriesList.SelectedIndex]
+						: this.sampleIndicesCount[this.categoriesList.SelectedIndex]) + "/" + this.lnSamples + " sample(s)";
+					this.statusBarProperties.Text = "";
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("UpdateStatusBarAndLabel " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("UpdateStatusBarAndLabel " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -441,20 +445,20 @@ namespace Aural_Probe
 		{
 			try
 			{
-				for (int i = 0; i < ConfigFile.MaxCategories; ++i)
+				for (var i = 0; i < ConfigFile.MaxCategories; ++i)
 				{
-					sampleIndicesCount[i] = 0;
+					this.sampleIndicesCount[i] = 0;
 				}
-				for (int i = 0; i < lnSamples; ++i)
+				for (var i = 0; i < this.lnSamples; ++i)
 				{
-					sampleList[i] = ""; // do I need to do this? :/
-					sampleBitField[i] = 0;
+					this.sampleList[i] = ""; // do I need to do this? :/
+					this.sampleBitField[i] = 0;
 				}
-				lnSamples = 0;
+				this.lnSamples = 0;
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("ClearSamples " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("ClearSamples " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -462,7 +466,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				bool bWantsToUseCache = bUseCache;
+				var bWantsToUseCache = bUseCache;
 				bUseCache = bUseCache && File.Exists(GetSampleCacheFilepath());
 				if (configFile.SearchDirectories.Count == 0)
 				{
@@ -486,68 +490,68 @@ namespace Aural_Probe
 				{
 					if (bUseCache)
 					{
-						statusLabel.Text = "Please wait. Loading audio samples from cache...";
-						Refresh();
-						progressForm.Restart(bUseCache);
-						DialogResult result = progressForm.ShowDialog(this);
+						this.statusLabel.Text = "Please wait. Loading audio samples from cache...";
+						this.Refresh();
+						this.progressForm.Restart(bUseCache);
+						var result = this.progressForm.ShowDialog(this);
 					}
 					else
 					{
 						if (!configFile.RescanPrompt || DialogResult.Yes == MessageBox.Show("Would you like to scan all search folders for audio samples now?", "Scan search folders for audio samples?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
 						{
-							statusLabel.Text = "Please wait. Scanning folders for audio samples...";
-							Refresh();
-							progressForm.Restart(bUseCache);
-							DialogResult result = progressForm.ShowDialog(this);
-							SaveAudioSampleCache();
+							this.statusLabel.Text = "Please wait. Scanning folders for audio samples...";
+							this.Refresh();
+							this.progressForm.Restart(bUseCache);
+							var result = this.progressForm.ShowDialog(this);
+							this.SaveAudioSampleCache();
 						}
-					}
-				}
-				return true;
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("PopulateCategoriesWithAudioSamples " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);				
-				return false;
-			}
-		}
-
-		static public string GetApplicationDataPath()
-		{
-			string applicationDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Aural Probe";
-			return applicationDataPath;
-		}
-
-		static public string GetSampleCacheFilepath()
-		{
-			return GetApplicationDataPath() + "\\" + kSampleCacheFilename;
-		}
-
-		public bool SaveAudioSampleCache()
-		{
-			try
-			{
-				System.IO.Directory.CreateDirectory(GetApplicationDataPath());
-				using(Stream myFileStream = File.OpenWrite(GetSampleCacheFilepath()))
-				{
-					BinaryFormatter serializer = new BinaryFormatter();
-					serializer.Serialize(myFileStream, kVersionedSampleCacheID);
-					serializer.Serialize(myFileStream, lnSamples);
-					for (int i = 0; i < lnSamples; ++i)
-					{
-						serializer.Serialize(myFileStream, sampleList[i]);
-						serializer.Serialize(myFileStream, sampleColorIndex[i]);
 					}
 				}
 				return true;
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("Error! Could not save sample cache! " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("PopulateCategoriesWithAudioSamples " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);				
+				return false;
+			}
+		}
+
+		static public string GetApplicationDataPath()
+		{
+			var applicationDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Aural Probe";
+			return applicationDataPath;
+		}
+
+		static public string GetSampleCacheFilepath()
+		{
+			return GetApplicationDataPath() + "\\" + SampleCacheFilename;
+		}
+
+		public bool SaveAudioSampleCache()
+		{
+			try
+			{
+				Directory.CreateDirectory(GetApplicationDataPath());
+				using(Stream myFileStream = File.OpenWrite(GetSampleCacheFilepath()))
+				{
+					var serializer = new BinaryFormatter();
+					serializer.Serialize(myFileStream, VersionedSampleCacheID);
+					serializer.Serialize(myFileStream, this.lnSamples);
+					for (var i = 0; i < this.lnSamples; ++i)
+					{
+						serializer.Serialize(myFileStream, this.sampleList[i]);
+						serializer.Serialize(myFileStream, this.sampleColorIndex[i]);
+					}
+				}
+				return true;
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Error! Could not save sample cache! " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				try { File.Delete(GetSampleCacheFilepath()); } 
 				catch
 				{
-					MessageBox.Show("Error! Could not delete sample cache! " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					MessageBox.Show("Error! Could not delete sample cache! " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 				return false;
 			}
@@ -560,9 +564,9 @@ namespace Aural_Probe
 		{
 			if( disposing )
 			{
-				if (components != null) 
+				if (this.components != null) 
 				{
-					components.Dispose();
+					this.components.Dispose();
 				}
 			}
 			base.Dispose( disposing );
@@ -576,7 +580,7 @@ namespace Aural_Probe
 		private void InitializeComponent()
 		{
 			this.components = new System.ComponentModel.Container();
-			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+			var resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
 			this.statusBar = new System.Windows.Forms.StatusBar();
 			this.statusBarPanel = new System.Windows.Forms.StatusBarPanel();
 			this.statusBarProperties = new System.Windows.Forms.StatusBarPanel();
@@ -1018,34 +1022,34 @@ namespace Aural_Probe
 			{
 				app.fmodManager.StopSoundPlayback();
 
-				FavoritesFile tempFavorites = new FavoritesFile();
-				if (lnSamples > 0 && sampleFavoritesCount[0] > 0)
+				var tempFavorites = new FavoritesFile();
+				if (this.lnSamples > 0 && app.Library.sampleFavoritesCount[0] > 0)
 				{
-					UpdateFavoritesFileFromFavoriteData(ref tempFavorites, false);
+					this.UpdateFavoritesFileFromFavoriteData(ref tempFavorites, false);
 				}
 
-				if (bUseCachedSamplesIfPossible && PopulateCategoriesWithAudioSamples(true))
+				if (this.bUseCachedSamplesIfPossible && this.PopulateCategoriesWithAudioSamples(true))
 				{
-					bUseCachedSamplesIfPossible = false;
+					this.bUseCachedSamplesIfPossible = false;
 				}
 				else
 				{
-					PopulateCategoriesWithAudioSamples(false);
+					this.PopulateCategoriesWithAudioSamples(false);
 				}
 
-				if (lnSamples > 0 && sampleFavoritesCount[0] > 0)
+				if (this.lnSamples > 0 && app.Library.sampleFavoritesCount[0] > 0)
 				{
-					UpdateFavoriteDataFromFavoritesFile(ref tempFavorites, false);
-					UpdateSampleFavorites();
+					this.UpdateFavoriteDataFromFavoritesFile(ref tempFavorites, false);
+					this.UpdateSampleFavorites();
 				}
 
-				UpdateFormWithConfigurationData();
-				UpdateAudioSamples();
-				UpdateTitleBarText();
+				this.UpdateFormWithConfigurationData();
+				this.UpdateAudioSamples();
+				this.UpdateTitleBarText();
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("RefreshForm " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("RefreshForm " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -1053,23 +1057,23 @@ namespace Aural_Probe
 		{
 			try
 			{
-				forceLoadFavoritesName = filename;
-				if (forceLoadFavoritesName.Length > 0)
+				this.forceLoadFavoritesName = filename;
+				if (this.forceLoadFavoritesName.Length > 0)
 				{
-					app.Files.favoritesFile.Load(forceLoadFavoritesName);
-					if (!UpdateFavoriteDataFromFavoritesFile(ref app.Files.favoritesFile, true))
+					app.Files.FavoritesFile.Load(this.forceLoadFavoritesName);
+					if (!this.UpdateFavoriteDataFromFavoritesFile(ref app.Files.FavoritesFile, true))
 					{
-						forceLoadFavoritesName = "";
-						app.Files.favoritesFile.Reset(0);
+						this.forceLoadFavoritesName = "";
+						app.Files.FavoritesFile.Reset(0);
 					}
-					UpdateSampleFavorites();
-					UpdateAudioSamples();
-					lbDirtyFavorites = false;
+					this.UpdateSampleFavorites();
+					this.UpdateAudioSamples();
+					this.lbDirtyFavorites = false;
 				}
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("SetForceLoadFavorites " + filename + " " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("SetForceLoadFavorites " + filename + " " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -1077,100 +1081,102 @@ namespace Aural_Probe
 		{
 			try
 			{
-				SaveFileDialog fdlg = new SaveFileDialog();
+				var fdlg = new SaveFileDialog();
 				fdlg.Title = "Save Favorites";
 				if (configFile.DefaultFavoritesDirectory.Length > 0)
 					fdlg.InitialDirectory = configFile.DefaultFavoritesDirectory;
 				fdlg.OverwritePrompt = true;
 				fdlg.Filter = "Aural Probe Favorites (*.apf)|*.apf|All files (*.*)|*.*";
-				fdlg.FileName = app.Files.favoritesFile.currentFavoritesFilename;
+				fdlg.FileName = app.Files.FavoritesFile.currentFavoritesFilename;
 				
-				DialogResult result = fdlg.ShowDialog();
+				var result = fdlg.ShowDialog();
 				if (fdlg.FileName.Length > 0)
 				{
-					UpdateFavoritesFileFromFavoriteData(ref app.Files.favoritesFile, true);
-					app.Files.favoritesFile.currentFavoritesFilename = fdlg.FileName;
-					app.Files.favoritesFile.Save();
-					lbDirtyFavorites = false;
-					UpdateFormWithConfigurationData();
-					UpdateAudioSamples();
-					UpdateTitleBarText();
+					this.UpdateFavoritesFileFromFavoriteData(ref app.Files.FavoritesFile, true);
+					app.Files.FavoritesFile.currentFavoritesFilename = fdlg.FileName;
+					app.Files.FavoritesFile.Save();
+					this.lbDirtyFavorites = false;
+					this.UpdateFormWithConfigurationData();
+					this.UpdateAudioSamples();
+					this.UpdateTitleBarText();
 					return true;
 				}
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MessageBox.Show("SaveFavorites " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("SaveFavorites " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 			return false;
 		}
 
-		private void toolBar1_ButtonClick(object sender, System.Windows.Forms.ToolBarButtonClickEventArgs e)
+		private void toolBar1_ButtonClick(object sender, ToolBarButtonClickEventArgs e)
 		{
 			try
 			{
-				if ( e.Button == toolBarButtonRescanFolders )
+				if ( e.Button == this.toolBarButtonRescanFolders )
 				{
-					RefreshForm();
+					this.RefreshForm();
 				} 
-				else if (e.Button == toolBarButtonPlayStop)
+				else if (e.Button == this.toolBarButtonPlayStop)
 				{
-					bool bPlaying = false;
-					if (channel != null)
-						channel.isPlaying(ref bPlaying);
+					var bPlaying = false;
+					if (this.channel != null)
+					{
+						this.channel.isPlaying(ref bPlaying);
+					}
 					if (bPlaying)
 					{
-						if (channel != null)
-							channel.stop();
-						toolBarButtonPlayStop.Enabled = listSamplesSingleSelectedIndex != -1;
-						toolBarButtonPlayStop.Text = "Play";
-						toolBarButtonPlayStop.ImageIndex = 7; // do work here
-						bAutoPlayNextSample = false;
+						if (this.channel != null)
+							this.channel.stop();
+						this.toolBarButtonPlayStop.Enabled = this.listSamplesSingleSelectedIndex != -1;
+						this.toolBarButtonPlayStop.Text = "Play";
+						this.toolBarButtonPlayStop.ImageIndex = 7; // do work here
+						this.bAutoPlayNextSample = false;
 					}
 					else
 					{
-						bAutoPlayNextSample = configFile.Autoplay;
-						nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
-						listSamples_SelectedIndexChanged(sender, e);
+						this.bAutoPlayNextSample = configFile.Autoplay;
+						this.nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
+						this.listSamples_SelectedIndexChanged(sender, e);
 					}
 				}
-				else if (e.Button == toolBarButtonFavoritesOnly )
+				else if (e.Button == this.toolBarButtonFavoritesOnly )
 				{
 					app.fmodManager.StopSoundPlayback();
 
-					lbFavoritesOnly = !lbFavoritesOnly;
-					UpdateFormWithConfigurationData();
-					UpdateAudioSamples();
+					this.lbFavoritesOnly = !this.lbFavoritesOnly;
+					this.UpdateFormWithConfigurationData();
+					this.UpdateAudioSamples();
 				
-					int nCurrentCategory = categoriesList.SelectedIndex;
-					if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+					var nCurrentCategory = this.categoriesList.SelectedIndex;
+					if (nCurrentCategory < 0 || this.sampleIndicesCount[nCurrentCategory] == 0)
 						return;
 				}
-				else if (e.Button == toolBarButtonResetFavorites )
+				else if (e.Button == this.toolBarButtonResetFavorites )
 				{
 					app.fmodManager.StopSoundPlayback();
 
-					if (sampleFavoritesCount[0] > 0 && 
+					if (app.Library.sampleFavoritesCount[0] > 0 && 
 						DialogResult.Yes == MessageBox.Show("Are you sure you want to reset the favorites?", "Reset favorites?", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
 					{
-						app.Files.favoritesFile.Reset(0);
-						UpdateFavoriteDataFromFavoritesFile(ref app.Files.favoritesFile, true);
-						lbDirtyFavorites = false;
-						UpdateSampleFavorites();
-						UpdateAudioSamples();
+						app.Files.FavoritesFile.Reset(0);
+						this.UpdateFavoriteDataFromFavoritesFile(ref app.Files.FavoritesFile, true);
+						this.lbDirtyFavorites = false;
+						this.UpdateSampleFavorites();
+						this.UpdateAudioSamples();
 					}
 				}
-				else if (e.Button == toolBarButtonLoadFavorites)
+				else if (e.Button == this.toolBarButtonLoadFavorites)
 				{
 					app.fmodManager.StopSoundPlayback();
 
-					if ((sampleFavoritesCount[0] == 0 || !lbDirtyFavorites) || DialogResult.Yes == MessageBox.Show(
+					if ((app.Library.sampleFavoritesCount[0] == 0 || !this.lbDirtyFavorites) || DialogResult.Yes == MessageBox.Show(
 						"You will lose all changes made to the current favorites. Are you sure?",
 						"Replace favorites?",
 						MessageBoxButtons.YesNo,
 						MessageBoxIcon.Question))
 					{
-						OpenFileDialog fdlg = new OpenFileDialog(); 
+						var fdlg = new OpenFileDialog(); 
 						fdlg.Title = "Open Favorites" ; 
 						if (configFile.DefaultFavoritesDirectory.Length > 0)
 							fdlg.InitialDirectory = configFile.DefaultFavoritesDirectory;
@@ -1178,42 +1184,42 @@ namespace Aural_Probe
 						fdlg.RestoreDirectory = true; 
 						if(fdlg.ShowDialog() == DialogResult.OK && fdlg.FileName.Length > 0) 
 						{
-							app.Files.favoritesFile.Load(fdlg.FileName);
-							lbDirtyFavorites = false;
-							UpdateFavoriteDataFromFavoritesFile(ref app.Files.favoritesFile, true);
-							UpdateSampleFavorites();
-							UpdateAudioSamples();
+							app.Files.FavoritesFile.Load(fdlg.FileName);
+							this.lbDirtyFavorites = false;
+							this.UpdateFavoriteDataFromFavoritesFile(ref app.Files.FavoritesFile, true);
+							this.UpdateSampleFavorites();
+							this.UpdateAudioSamples();
 						}
 					}
 				}
-				else if (e.Button == toolBarButtonSaveFavorites )
+				else if (e.Button == this.toolBarButtonSaveFavorites )
 				{
 					app.fmodManager.StopSoundPlayback();
 
-					if (sampleFavoritesCount[0] == 0)
+					if (app.Library.sampleFavoritesCount[0] == 0)
 					{
 						MessageBox.Show("There are no favorites to save.", "Save Favorites", MessageBoxButtons.OK, MessageBoxIcon.Information);
 					}
 					else
 					{
-						SaveFavorites();
+						this.SaveFavorites();
 					}
 				}
-				else if (e.Button == toolBarButtonConfiguration )
+				else if (e.Button == this.toolBarButtonConfiguration )
 				{
 					app.fmodManager.StopSoundPlayback();
 
-					DialogResult result = configurationForm.ShowDialog(this);
+					var result = this.configurationForm.ShowDialog(this);
 					if (result == DialogResult.Retry)
 					{
 						// we need to rescan folders!
-						RefreshForm();
+						this.RefreshForm();
 					}
 					else if (result == DialogResult.OK)
 					{
 						// settings have changed but sample data + favorites are still valid
-						UpdateFormWithConfigurationData();
-						UpdateAudioSamples();
+						this.UpdateFormWithConfigurationData();
+						this.UpdateAudioSamples();
 					}
 					else
 					{
@@ -1221,7 +1227,7 @@ namespace Aural_Probe
 					}
 					
 				}
-				else if ( e.Button == toolBarButtonHelp )
+				else if ( e.Button == this.toolBarButtonHelp )
 				{
 					app.fmodManager.StopSoundPlayback();
 
@@ -1235,41 +1241,41 @@ namespace Aural_Probe
 					}
 				
 				}
-				else if ( e.Button == toolBarButtonAbout )
+				else if ( e.Button == this.toolBarButtonAbout )
 				{
 					app.fmodManager.StopSoundPlayback();
 
-					aboutForm.ShowDialog();
+					this.aboutForm.ShowDialog();
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("toolBar1_ButtonClick " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);				
+				MessageBox.Show("toolBar1_ButtonClick " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);				
 			}
 		}
 
-		private void categoriesList_SelectedIndexChanged(object sender, System.EventArgs e)
+		private void categoriesList_SelectedIndexChanged(object sender, EventArgs e)
 		{
 			try
 			{
-				listSamplesLastSelectedIndices = null;
-				UpdateStatusBarAndLabel();
-				Refresh();
-				UpdateAudioSamples();
+				this.listSamplesLastSelectedIndices = null;
+				this.UpdateStatusBarAndLabel();
+				this.Refresh();
+				this.UpdateAudioSamples();
 
-				bool bIsPlaying = false;
-				if (channel != null)
-					channel.isPlaying(ref bIsPlaying);
+				var bIsPlaying = false;
+				if (this.channel != null)
+					this.channel.isPlaying(ref bIsPlaying);
 				if (!bIsPlaying)
 				{
-					toolBarButtonPlayStop.Enabled = false;
-					toolBarButtonPlayStop.Text = "Play";
-					toolBarButtonPlayStop.ImageIndex = 7;
+					this.toolBarButtonPlayStop.Enabled = false;
+					this.toolBarButtonPlayStop.Text = "Play";
+					this.toolBarButtonPlayStop.ImageIndex = 7;
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("categoriesList_SelectedIndexChanged " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("categoriesList_SelectedIndexChanged " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -1283,21 +1289,21 @@ namespace Aural_Probe
 			return FMOD.RESULT.OK;
 		}
 
-		private void listSamples_SelectedIndexChanged(object sender, System.EventArgs e)
+		private void listSamples_SelectedIndexChanged(object sender, EventArgs e)
 		{
-			nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
-			listSamplesSelectedIndexChanged();
+			this.nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
+			this.listSamplesSelectedIndexChanged();
 		}
 
 		private void UpdateListSamplesSingleSelectedIndex()
 		{
-			if (listSamples.SelectedIndices.Count == 1)
+			if (this.listSamples.SelectedIndices.Count == 1)
 			{
-				listSamplesSingleSelectedIndex = listSamples.SelectedIndices[0];
+				this.listSamplesSingleSelectedIndex = this.listSamples.SelectedIndices[0];
 			}
 			else
 			{
-				listSamplesSingleSelectedIndex = -1; // don't allow an active singular selection if multiple items are selected
+				this.listSamplesSingleSelectedIndex = -1; // don't allow an active singular selection if multiple items are selected
 			}
 		}
 
@@ -1305,68 +1311,68 @@ namespace Aural_Probe
 		{
 			try
 			{
-				UpdateListSamplesSingleSelectedIndex();
+				this.UpdateListSamplesSingleSelectedIndex();
 
 				// Invalidate last list sample indices
-				if (listSamplesLastSelectedIndices != null)
+				if (this.listSamplesLastSelectedIndices != null)
 				{
-					for (int i = 0; i < listSamplesLastSelectedIndices.Length; ++i)
+					for (var i = 0; i < this.listSamplesLastSelectedIndices.Length; ++i)
 					{
-						listSamples.Invalidate(listSamples.GetItemRectangle(listSamplesLastSelectedIndices[i]));
+						this.listSamples.Invalidate(this.listSamples.GetItemRectangle(this.listSamplesLastSelectedIndices[i]));
 					}
 				}
 
 				// Copy current list sample indices to last list sample indices
-				listSamplesLastSelectedIndices = new int[listSamples.SelectedIndices.Count];
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
+				this.listSamplesLastSelectedIndices = new int[this.listSamples.SelectedIndices.Count];
+				for (var i = 0; i < this.listSamples.SelectedIndices.Count; ++i)
 				{
-					listSamplesLastSelectedIndices[i] = listSamples.SelectedIndices[i];
+					this.listSamplesLastSelectedIndices[i] = this.listSamples.SelectedIndices[i];
 				}
 
 				// Invalidate current list sample indices
-				for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
+				for (var i = 0; i < this.listSamples.SelectedIndices.Count; ++i)
 				{
-					listSamples.Invalidate(listSamples.GetItemRectangle(listSamples.SelectedIndices[i]));
+					this.listSamples.Invalidate(this.listSamples.GetItemRectangle(this.listSamples.SelectedIndices[i]));
 				}
 
 				// Update popup context menu and default Favorites checkbox state
-				listSamples.ContextMenu = listSamples.SelectedIndices.Count > 0 ? sampleListMenu : null;
-				sampleListMenu.MenuItems[3].Checked = false;
+				this.listSamples.ContextMenu = this.listSamples.SelectedIndices.Count > 0 ? this.sampleListMenu : null;
+				this.sampleListMenu.MenuItems[3].Checked = false;
 
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+				var nCurrentCategory = this.categoriesList.SelectedIndex;
+				if (nCurrentCategory < 0 || this.sampleIndicesCount[nCurrentCategory] == 0)
 					return;
-				int nCurrentSample = CalculateRealSampleIndex(listSamplesSingleSelectedIndex);
+				var nCurrentSample = this.CalculateRealSampleIndex(this.listSamplesSingleSelectedIndex);
 				if (nCurrentSample < 0)
 				{
-					toolBarButtonPlayStop.Enabled = false;
-					toolBarButtonPlayStop.Text = "Play";
-					toolBarButtonPlayStop.ImageIndex = 7;
+					this.toolBarButtonPlayStop.Enabled = false;
+					this.toolBarButtonPlayStop.Text = "Play";
+					this.toolBarButtonPlayStop.ImageIndex = 7;
 					return;
 				}
 
-				int nSampleIndex = sampleIndices[nCurrentCategory, nCurrentSample];
+				var nSampleIndex = this.sampleIndices[nCurrentCategory, nCurrentSample];
 
 				// update favorites checkbox state in popup menu if applicable
-				if (listSamplesSingleSelectedIndex != -1)
-					sampleListMenu.MenuItems[3].Checked = app.GetSampleFlag(nSampleIndex, bitFavorite);
+				if (this.listSamplesSingleSelectedIndex != -1)
+					this.sampleListMenu.MenuItems[3].Checked = app.GetSampleFlag(nSampleIndex, BitFavorite);
 
-				string sampleName = sampleList[nSampleIndex];
+				var sampleName = this.sampleList[nSampleIndex];
 
-				statusBarPanel.Text = sampleName;
-				statusBarPanel.ToolTipText = sampleName;
+				this.statusBarPanel.Text = sampleName;
+				this.statusBarPanel.ToolTipText = sampleName;
 
-				bool sampleFileExists = File.Exists(sampleName);
-				app.SetSampleFlag(nSampleIndex, bitMissing, !sampleFileExists);
+				var sampleFileExists = File.Exists(sampleName);
+				app.SetSampleFlag(nSampleIndex, BitMissing, !sampleFileExists);
 				if (!sampleFileExists)
 					return;
 
 				try
 				{
 					FMOD.RESULT result;
-					if (channel != null)
+					if (this.channel != null)
 					{
-						channel.stop();
+						this.channel.stop();
 					}
 
 					if (sound != null)
@@ -1376,41 +1382,41 @@ namespace Aural_Probe
 						sound = null;
 					}
 
-					result = app.fmodManager.systemFMOD.createSound(sampleName, FMOD.MODE.SOFTWARE | FMOD.MODE.CREATESTREAM, ref sound);
+					result = app.fmodManager.SystemFmod.createSound(sampleName, FMOD.MODE.SOFTWARE | FMOD.MODE.CREATESTREAM, ref sound);
 					fmodUtils.ERRCHECK(result);
-					bool createSoundSucceeded = result == FMOD.RESULT.OK;
+					var createSoundSucceeded = result == FMOD.RESULT.OK;
 
 					if (createSoundSucceeded)
 					{
 						result = sound.setMode(FMOD.MODE.LOOP_OFF);
 						fmodUtils.ERRCHECK(result);
-						if (lbDontPlayNextSample)
+						if (this.lbDontPlayNextSample)
 						{
-							lbDontPlayNextSample = false;
+							this.lbDontPlayNextSample = false;
 						}
 						else
 						{
-							result = app.fmodManager.systemFMOD.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
+							result = app.fmodManager.SystemFmod.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref this.channel);
 							fmodUtils.ERRCHECK(result);
 
-							if (channel != null)
+							if (this.channel != null)
 							{
-								channel.setCallback(cbFMOD);
+								this.channel.setCallback(this.cbFMOD);
 							}
 
-							toolBarButtonPlayStop.Enabled = listSamplesSingleSelectedIndex != -1;
-							toolBarButtonPlayStop.Text = "Stop";
-							toolBarButtonPlayStop.ImageIndex = 8;
-							bAutoPlayNextSample = configFile.Autoplay;
+							this.toolBarButtonPlayStop.Enabled = this.listSamplesSingleSelectedIndex != -1;
+							this.toolBarButtonPlayStop.Text = "Stop";
+							this.toolBarButtonPlayStop.ImageIndex = 8;
+							this.bAutoPlayNextSample = configFile.Autoplay;
 						}
 						FMOD.SOUND_TYPE stype = 0;
 						FMOD.SOUND_FORMAT sformat = 0;
-						int schannels = 0;
-						int sbits = 0;
+						var schannels = 0;
+						var sbits = 0;
 						float freq = 0;
 						float vol = 0;
 						float pan = 0;
-						int pri = 0;
+						var pri = 0;
 						uint length = 0;
 
 						result = sound.getFormat(ref stype, ref sformat, ref schannels, ref sbits);
@@ -1422,75 +1428,75 @@ namespace Aural_Probe
 						result = sound.getLength(ref length, FMOD.TIMEUNIT.MS);
 						fmodUtils.ERRCHECK(result);
 
-						string lengthstr = (length / (float)1000).ToString() + "s";
-						statusBarProperties.Text =
-							(freq / 1000).ToString() + "KHz " +
-							sbits.ToString() + "-bit " +
+						var lengthstr = (length / (float)1000) + "s";
+						this.statusBarProperties.Text =
+							(freq / 1000) + "KHz " +
+							sbits + "-bit " +
 							(schannels > 1 ? "Stereo " : "Mono ") +
-							"(" + sformat.ToString() + "), " +
+							"(" + sformat + "), " +
 							lengthstr;
 					}
 					else
 					{
-						app.SetSampleFlag(nSampleIndex, bitMissing, true);
-						listSamples.Invalidate(listSamples.GetItemRectangle(listSamplesSingleSelectedIndex));
-						
-						statusBarPanel.Text = sampleName;
-						statusBarProperties.Text = "ERROR: Unable to play sample.";
+						app.SetSampleFlag(nSampleIndex, BitMissing, true);
+						this.listSamples.Invalidate(this.listSamples.GetItemRectangle(this.listSamplesSingleSelectedIndex));
+
+						this.statusBarPanel.Text = sampleName;
+						this.statusBarProperties.Text = "ERROR: Unable to play sample.";
 					}
 				}
-				catch (System.Exception ex)
+				catch (Exception ex)
 				{
-					MessageBox.Show("Error!  Could not play sample. " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					MessageBox.Show("Error!  Could not play sample. " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("listSamples_SelectedIndexChanged " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("listSamples_SelectedIndexChanged " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
-		private void listSamples_DrawItem(object sender, System.Windows.Forms.DrawItemEventArgs e)
+		private void listSamples_DrawItem(object sender, DrawItemEventArgs e)
 		{
 			try
 			{
-				int nRealIndex = CalculateRealSampleIndex(e.Index);
+				var nRealIndex = this.CalculateRealSampleIndex(e.Index);
 				if (nRealIndex < 0)
 					return;
 
 				// Set the DrawMode property to draw fixed sized items.
-				listSamples.DrawMode = DrawMode.OwnerDrawFixed;
+				this.listSamples.DrawMode = DrawMode.OwnerDrawFixed;
 				// Draw the background of the ListBox control for each item.
 				e.DrawBackground();
 
-				int nCurrentCategory = categoriesList.SelectedIndex;
-				if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+				var nCurrentCategory = this.categoriesList.SelectedIndex;
+				if (nCurrentCategory < 0 || this.sampleIndicesCount[nCurrentCategory] == 0)
 					return;
-				int nCurrentSample = nRealIndex;
+				var nCurrentSample = nRealIndex;
 				if (nCurrentSample < 0)
 					return;
-				int sampleIndex = sampleIndices[nCurrentCategory, nCurrentSample];
+				var sampleIndex = this.sampleIndices[nCurrentCategory, nCurrentSample];
 
 				Color color;
-				if (listSamples.SelectedIndices.Contains(e.Index))
+				if (this.listSamples.SelectedIndices.Contains(e.Index))
 				{
-					color = app.colorList[sampleColorIndex[sampleIndex],1];
+					color = app.colorList[this.sampleColorIndex[sampleIndex],1];
 				}
 				else
 				{
-					color = app.colorList[sampleColorIndex[sampleIndex],0];
+					color = app.colorList[this.sampleColorIndex[sampleIndex],0];
 				}
 
-				if (app.GetSampleFlag(sampleIndex, bitMissing))
+				if (app.GetSampleFlag(sampleIndex, BitMissing))
 				{
 					color = Color.Red;
 				}
 
-				SolidBrush brush = new SolidBrush(color);
-				Pen favoritePen = new Pen(Color.White, 3);
+				var brush = new SolidBrush(color);
+				var favoritePen = new Pen(Color.White, 3);
 
-				Brush textBrush = Brushes.Black;
-				int nBorder = 2;
+				var textBrush = Brushes.Black;
+				var nBorder = 2;
 				Rectangle boundedText;
 				boundedText = e.Bounds;
 				boundedText.X += nBorder * 2;
@@ -1499,24 +1505,24 @@ namespace Aural_Probe
 				boundedText.Height -= nBorder * 4;
 				e.Graphics.FillRectangle(brush, e.Bounds.X + nBorder, e.Bounds.Y + nBorder, e.Bounds.Width - (nBorder * 2), e.Bounds.Height - (nBorder * 2));
 
-				if (app.GetSampleFlag(sampleIndex, bitFavorite))
+				if (app.GetSampleFlag(sampleIndex, BitFavorite))
 				{
 					e.Graphics.DrawRectangle(favoritePen, e.Bounds.X + nBorder, e.Bounds.Y + nBorder, e.Bounds.Width - (nBorder * 2), e.Bounds.Height - (nBorder * 2));
 				}
 
-				string sampleName = sampleList[sampleIndex];
-				string[] split = sampleName.Split('\\');
-				string name = split[split.Length - 1];
+				var sampleName = this.sampleList[sampleIndex];
+				var split = sampleName.Split('\\');
+				var name = split[split.Length - 1];
 
 				e.Graphics.DrawString(name, e.Font, textBrush, boundedText,StringFormat.GenericDefault);
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("listSamples_DrawItem " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("listSamples_DrawItem " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
-		private void listSamples_OnKeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
+		private void listSamples_OnKeyDown(object sender, KeyEventArgs e)
 		{
 			try
 			{
@@ -1534,9 +1540,9 @@ namespace Aural_Probe
 				if (e.KeyCode == Keys.Delete)
 					app.DeleteSamples(sender, e);
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("listSamples_OnKeyDown " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("listSamples_OnKeyDown " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -1544,18 +1550,18 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!lbFavoritesOnly)
+				if (!this.lbFavoritesOnly)
 					return listBoxIndex;
 				else
 				{
-					int nCurrentCategory = categoriesList.SelectedIndex;
-					if (nCurrentCategory < 0 || sampleIndicesCount[nCurrentCategory] == 0)
+					var nCurrentCategory = this.categoriesList.SelectedIndex;
+					if (nCurrentCategory < 0 || this.sampleIndicesCount[nCurrentCategory] == 0)
 						return -1;
-					int nFavoriteCount = 0;
-					for (int i = 0; i < sampleIndicesCount[nCurrentCategory]; ++i)
+					var nFavoriteCount = 0;
+					for (var i = 0; i < this.sampleIndicesCount[nCurrentCategory]; ++i)
 					{
-						int nSampleIndex = sampleIndices[nCurrentCategory, i];
-						if (app.GetSampleFlag(nSampleIndex, bitFavorite))
+						var nSampleIndex = this.sampleIndices[nCurrentCategory, i];
+						if (app.GetSampleFlag(nSampleIndex, BitFavorite))
 						{
 							if (nFavoriteCount == listBoxIndex)
 								return i;
@@ -1564,9 +1570,9 @@ namespace Aural_Probe
 					}
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("CalculateRealSampleIndex " + listBoxIndex + " " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
+				MessageBox.Show("CalculateRealSampleIndex " + listBoxIndex + " " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
 			}
 			return -1;
 		}
@@ -1575,11 +1581,11 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!lbDirtyFavorites || sampleFavoritesCount[0] == 0)
+				if (!this.lbDirtyFavorites || app.Library.sampleFavoritesCount[0] == 0)
 					return;
 
 				// User is trying to log out. Prompt the user with choices
-				DialogResult dr = MessageBox.Show(  "Do you want to save changes to your favorites before you logout?\n"+
+				var dr = MessageBox.Show(  "Do you want to save changes to your favorites before you logout?\n"+
 					"Click Yes to save favorites and log out\n"+
 					"Click No to logout without saving favorites\n"+
 					"Click Cancel to cancel logout and manually close Aural Probe", "Save changes?",
@@ -1595,7 +1601,7 @@ namespace Aural_Probe
 					// Save data and logout
 				else if( dr == DialogResult.Yes )
 				{
-					e.Cancel = !SaveFavorites(); // if we cancel for some reason, don't abort program, let them save again!
+					e.Cancel = !this.SaveFavorites(); // if we cancel for some reason, don't abort program, let them save again!
 
 				}
 					// Bad user! doesn't care about poor data
@@ -1605,9 +1611,9 @@ namespace Aural_Probe
 					return;
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("SystemEvents_SessionEnding " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("SystemEvents_SessionEnding " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 
 		}
@@ -1616,15 +1622,15 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!lbDirtyFavorites || sampleFavoritesCount[0] == 0)
+				if (!this.lbDirtyFavorites || app.Library.sampleFavoritesCount[0] == 0)
 					return;
 
 				MessageBox.Show(  "Warning! The system is low on memory. Save your favorites!", "Low memory detected!",
 					MessageBoxButtons.OK, MessageBoxIcon.Exclamation  );
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("SystemEvents_LowMemory " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("SystemEvents_LowMemory " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -1632,24 +1638,24 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (app.fmodManager != null && app.fmodManager.systemFMOD != null && app.fmodManager.bFMODInitialised && channel != null)
+				if (app.fmodManager != null && app.fmodManager.SystemFmod != null && app.fmodManager.FmodInitialised && this.channel != null)
 				{
-					FMOD.RESULT result = app.fmodManager.systemFMOD.update();
+					var result = app.fmodManager.SystemFmod.update();
 					fmodUtils.ERRCHECK(result);
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("timer_Elapsed " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("timer_Elapsed " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 
 			// handle AutoPlay
 			try
 			{
-				bool isPlaying = false;
-				if (channel != null)
+				var isPlaying = false;
+				if (this.channel != null)
 				{
-					channel.isPlaying(ref isPlaying);
+					this.channel.isPlaying(ref isPlaying);
 				}
 
 				if (gMainForm != null && gMainForm.bAutoPlayNextSample && gMainForm.listSamplesSingleSelectedIndex != -1 && (gMainForm.nAutoPlayRepeatsLeft > 1 || (gMainForm.listSamplesSingleSelectedIndex < gMainForm.listSamples.Items.Count - 1)) && !isPlaying)
@@ -1661,11 +1667,11 @@ namespace Aural_Probe
 					}
 					else
 					{
-						gMainForm.nAutoPlayRepeatsLeft = MainForm.configFile.AutoplayRepeats;
-						int newSelectedIndex = listSamplesSingleSelectedIndex + 1;
+						gMainForm.nAutoPlayRepeatsLeft = configFile.AutoplayRepeats;
+						var newSelectedIndex = this.listSamplesSingleSelectedIndex + 1;
 						if (newSelectedIndex < gMainForm.listSamples.Items.Count)
 						{
-							gMainForm.listSamples.SetSelected(listSamplesSingleSelectedIndex, false);
+							gMainForm.listSamples.SetSelected(this.listSamplesSingleSelectedIndex, false);
 							gMainForm.listSamples.SetSelected(newSelectedIndex, true);
 						}
 					}
@@ -1674,94 +1680,94 @@ namespace Aural_Probe
 				{
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("timer_Elapsed " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("timer_Elapsed " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 
 		}
 
-		private void listSamples_OnMouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
+		private void listSamples_OnMouseMove(object sender, MouseEventArgs e)
 		{
 			try
 			{
 				if (!SamplesListBox.s_allowLeftMouseDownEvent && e.Button == MouseButtons.Left)
 				{
 					// Handle drag + drop - this is a synchronous event, and will block this thread until DoDragDrop is complete (by failing or succeeding)
-					int nCurrentCategory = categoriesList.SelectedIndex;
-					if (listSamples.SelectedIndices.Count == 0)
+					var nCurrentCategory = this.categoriesList.SelectedIndex;
+					if (this.listSamples.SelectedIndices.Count == 0)
 						return;
-					string[] files = new String[listSamples.SelectedIndices.Count];
-					for (int i = 0; i < listSamples.SelectedIndices.Count; ++i)
+					var files = new String[this.listSamples.SelectedIndices.Count];
+					for (var i = 0; i < this.listSamples.SelectedIndices.Count; ++i)
 					{
-						int nCurrentSample = CalculateRealSampleIndex(listSamples.SelectedIndices[i]);
+						var nCurrentSample = this.CalculateRealSampleIndex(this.listSamples.SelectedIndices[i]);
 						if (nCurrentSample < 0)
 							continue;
-						files[i] = sampleList[sampleIndices[nCurrentCategory, nCurrentSample]];
+						files[i] = this.sampleList[this.sampleIndices[nCurrentCategory, nCurrentSample]];
 					}
-					DataObject objData = new DataObject(DataFormats.FileDrop, files);
-					listSamples.DoDragDrop(objData, DragDropEffects.Copy);
+					var objData = new DataObject(DataFormats.FileDrop, files);
+					this.listSamples.DoDragDrop(objData, DragDropEffects.Copy);
 				}
 			}
-			catch (System.Exception ex)
+			catch (Exception ex)
 			{
-				MessageBox.Show("OnMouseMove " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("OnMouseMove " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		
 		}
 
-		private void trackBarMasterVol_Scroll(object sender, System.EventArgs e)
+		private void trackBarMasterVol_Scroll(object sender, EventArgs e)
 		{
-			UpdateVolume();
+			this.UpdateVolume();
 		}
 
-		private void MainForm_Load(object sender, System.EventArgs e)
+		private void MainForm_Load(object sender, EventArgs e)
 		{
 		
 		}
 
-		private void MainForm_Resize(object sender, System.EventArgs e)
+		private void MainForm_Resize(object sender, EventArgs e)
 		{
-			if (FormWindowState.Minimized == WindowState)
-				Hide();
+			if (FormWindowState.Minimized == this.WindowState)
+				this.Hide();
 		}
 
-		private void notifyIcon1_DoubleClick(object sender, System.EventArgs e)
+		private void notifyIcon1_DoubleClick(object sender, EventArgs e)
 		{
-			if (FormWindowState.Minimized == WindowState)
+			if (FormWindowState.Minimized == this.WindowState)
 			{
-				Show();
-				WindowState = FormWindowState.Normal;
+				this.Show();
+				this.WindowState = FormWindowState.Normal;
 			}
 		}
 
-		private void contextMenuNotify_Popup(object sender, System.EventArgs e)
+		private void contextMenuNotify_Popup(object sender, EventArgs e)
 		{
 		}
 
-		private void menuItem2_Click(object sender, System.EventArgs e)
+		private void menuItem2_Click(object sender, EventArgs e)
 		{
 			Application.Exit();
 		}
 
-		private void menuItem1_Click(object sender, System.EventArgs e)
+		private void menuItem1_Click(object sender, EventArgs e)
 		{
-			if (FormWindowState.Minimized == WindowState)
+			if (FormWindowState.Minimized == this.WindowState)
 			{
-				Show();
-				WindowState = FormWindowState.Normal;
+				this.Show();
+				this.WindowState = FormWindowState.Normal;
 			}
 		}
 
 		private void listSamples_PreMouseDown(object sender, EventArgs e)
 		{
-			System.Drawing.Point point = System.Windows.Forms.Cursor.Position;
-			point = listSamples.PointToClient(point);
-			int listBoxSampleIndex = listSamples.IndexFromPoint(point);
+			var point = Cursor.Position;
+			point = this.listSamples.PointToClient(point);
+			var listBoxSampleIndex = this.listSamples.IndexFromPoint(point);
 			if (listBoxSampleIndex != ListBox.NoMatches)
 			{
 				// only allow left mouse down event to go through to ListBox (which modifies the selection) when clicking on an unselected item, or if CTRL is held down (meaning the user is trying to turn off an actively selected element)
-				SamplesListBox.s_allowLeftMouseDownEvent = !listSamples.SelectedIndices.Contains(listBoxSampleIndex) || Control.ModifierKeys == Keys.Control;
+				SamplesListBox.s_allowLeftMouseDownEvent = !this.listSamples.SelectedIndices.Contains(listBoxSampleIndex) || ModifierKeys == Keys.Control;
 			}
 		}
 
@@ -1770,13 +1776,13 @@ namespace Aural_Probe
 			// Manually draw the status bar panel text here to avoid 127 character limit.
 			// See http://msdn.microsoft.com/en-us/library/vstudio/we893ad3%28v=vs.80%29.aspx
 
-			StringFormat textFormat = new StringFormat();
+			var textFormat = new StringFormat();
 			textFormat.LineAlignment = StringAlignment.Center; // vertical middle
 			textFormat.Alignment = StringAlignment.Near; // horizontal left
 			
-			string text = e.Panel.Text;
+			var text = e.Panel.Text;
 			int indexForward, indexBackward, finalIndex;
-			while (e.Graphics.MeasureString(text, statusBar.Font).Width > e.Bounds.Width)
+			while (e.Graphics.MeasureString(text, this.statusBar.Font).Width > e.Bounds.Width)
 			{
 				indexForward = text.IndexOf('\\');
 				indexBackward = text.IndexOf('/');
@@ -1787,7 +1793,7 @@ namespace Aural_Probe
 					finalIndex = indexBackward;
 				text = text.Substring(finalIndex + 1);
 			}
-			e.Graphics.DrawString(text, statusBar.Font, Brushes.Black, new RectangleF(e.Bounds.X, e.Bounds.Y, e.Bounds.Width, e.Bounds.Height), textFormat);
+			e.Graphics.DrawString(text, this.statusBar.Font, Brushes.Black, new RectangleF(e.Bounds.X, e.Bounds.Y, e.Bounds.Width, e.Bounds.Height), textFormat);
 		}
 	}
 }

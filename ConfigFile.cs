@@ -130,46 +130,30 @@ namespace Aural_Probe
 			// honestly I don't see exactly what this thing is for?
 			// I'm guessing if you have several search directories, and they overlap in some manner?
 			// or something like that?
-			foreach (var searchDirectory in this.SearchDirectories)
+			foreach (var dir in this.SearchDirectories)
 			{
-				var str = searchDirectory?.ToLower();
+				var searchDirectory = dir?.ToLower();
 
-				if (str == null)
+				// ReSharper disable once AssignNullToNotNullAttribute
+				// We don't allow SearchDirectories to contain nulls.
+				if (!Directory.Exists(searchDirectory) || scrubbedList.Contains(searchDirectory))
 				{
 					continue;
 				}
 
-				if (Directory.Exists(str))
+				// If searchDirectory is a subfolder of any other search directory,
+				// skip it, by adding it to the list of already scrubbed.
+				// Because it will be, later on, when we scrub the parent, since it goes
+				// into folders recursively.
+				// (afaik)
+				// (tbh this shit is pretty confusing, what exactly are we trying to avoid here?)
+
+				if (!this.SearchDirectories
+					.Select(directory => directory.ToLower())
+					.Where(directory => directory != searchDirectory)
+					.Any(directory => searchDirectory.Contains(directory)))
 				{
-					// skip duplicates
-					// (or maybe just like, yknow, don't allowed duplicates)
-					// (probably better way of handling this)
-					if (!scrubbedList.Contains(str))
-					{
-						var bAlreadyContainedByOtherDirectory = false;
-
-						//for (int j = 0; j < lnNumSearchDirectories; ++j)
-						foreach (var secondSearchDirectory in this.SearchDirectories)
-						{
-							var newStr = secondSearchDirectory?.ToLower();
-
-							if (newStr == null || str == newStr)
-							{
-								continue;
-							}
-
-							if (str.IndexOf(newStr, StringComparison.Ordinal) != -1)
-							{
-								bAlreadyContainedByOtherDirectory = true;
-								break;
-							}
-						}
-
-						if (!bAlreadyContainedByOtherDirectory)
-						{
-							scrubbedList.Add(searchDirectory);
-						}
-					}
+					scrubbedList.Add(dir);
 				}
 			}
 

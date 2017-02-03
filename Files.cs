@@ -2,8 +2,8 @@
 {
 	public class Files
 	{
-		public string workingDirectory;
-		public ConfigFile configFile;
-		public FavoritesFile favoritesFile;
+		public string WorkingDirectory;
+		public ConfigFile ConfigFile;
+		public FavoritesFile FavoritesFile;
 	}
 }
