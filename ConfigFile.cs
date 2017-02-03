@@ -57,6 +57,8 @@ namespace Aural_Probe
 		private ConfigFile()
 		{
 			this.Categories = new List<Category>();
+			this.SearchDirectories = new List<string>();
+			this.SearchDirectoriesScrubbed = new List<string>();
 
 			this.RescanPrompt = true;
 			this.IncludeFilePaths = true;
