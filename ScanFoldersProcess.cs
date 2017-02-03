@@ -13,25 +13,8 @@ namespace Aural_Probe
 	/// </summary>
 	public class ScanFoldersProcess
 	{
-		static public string[] formatStrings =
-		{
-			"*.wav",
-			"*.mp3",
-			"*.wma",
-			"*.ogg",
-			"*.aif",
-			"*.flac"
-		};
-
-		static public bool[] formatFlag =
-		{
-			true,
-			true,
-			true,
-			true,
-			true,
-			true,
-		};
+		public static string[] formatStrings = { "*.wav", "*.mp3", "*.wma", "*.ogg", "*.aif", "*.flac" };
+		public static bool[] formatFlag = { true, true, true, true, true, true, };
 		
 
 		// Main thread sets this event to stop worker thread:
@@ -50,8 +33,8 @@ namespace Aural_Probe
 
 		bool bCancelled;
 
-		int nFileCount = 0;
-		int nDirectoryCount = 0;
+		int nFileCount;
+		int nDirectoryCount;
 
 		public ScanFoldersProcess(
 			ManualResetEvent eventStop, 
@@ -60,12 +43,12 @@ namespace Aural_Probe
 			ProgressBar progressBar,
 			MainForm mainForm)
 		{
-			bCancelled = false;
-			m_bUseCache = bUseCache;
-			m_EventStop = eventStop;
-			m_EventStopped = eventStopped;
-			m_mainForm = mainForm;
-			m_progressBar = progressBar;
+			this.bCancelled = false;
+			this.m_bUseCache = bUseCache;
+			this.m_EventStop = eventStop;
+			this.m_EventStopped = eventStopped;
+			this.m_mainForm = mainForm;
+			this.m_progressBar = progressBar;
 		}
 
 		public bool IsDirectoryHidden(string dir)
@@ -78,28 +61,28 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (IsDirectoryHidden(dir))
+				if (this.IsDirectoryHidden(dir))
 					return 0;
 
 				if (!Directory.Exists(dir))
 					return 0;
 
 				// check if thread is cancelled
-				if (m_EventStop.WaitOne(0, true))
+				if (this.m_EventStop.WaitOne(0, true))
 				{
-					bCancelled = true;
+					this.bCancelled = true;
 					return 0;
 				}
 
-				nDirectoryCount++;
-				if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
-					m_progressBar.Invoke(m_progressBar.m_DelegateUpdateLabel, nDirectoryCount.ToString() + " folder(s) found");
+				this.nDirectoryCount++;
+				if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+					this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateLabel, this.nDirectoryCount.ToString() + " folder(s) found");
 
 				int nSubDirectories = 1;
 				foreach (string s in Directory.GetDirectories(dir))
 				{
-					if (!bCancelled)
-						nSubDirectories += CountDirectoriesInDirectory(s);
+					if (!this.bCancelled)
+						nSubDirectories += this.CountDirectoriesInDirectory(s);
 				}
 				return nSubDirectories;
 			}
@@ -114,36 +97,36 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (IsDirectoryHidden(dir))
+				if (this.IsDirectoryHidden(dir))
 					return 0;
 
 				if (!Directory.Exists(dir))
 					return 0;
 
 				// check if thread is cancelled
-				if (m_EventStop.WaitOne(0, true))
+				if (this.m_EventStop.WaitOne(0, true))
 				{
-					bCancelled = true;
+					this.bCancelled = true;
 					return 0;
 				}
 
 				int nFiles = Directory.GetFiles(dir).Length;
 				foreach (string s in Directory.GetDirectories(dir))
 				{
-					if (!bCancelled)
-						nFiles += CountFilesInDirectory(s);
+					if (!this.bCancelled)
+						nFiles += this.CountFilesInDirectory(s);
 				}
 
-				nFileCount += nFiles;
-				if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
-					m_progressBar.Invoke(m_progressBar.m_DelegateUpdateLabel, nFileCount.ToString() + " file(s) found");
+				this.nFileCount += nFiles;
+				if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+					this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateLabel, this.nFileCount.ToString() + " file(s) found");
 				
 				return nFiles;
 			}
 			catch
 			{
 				// something went wrong at the OS level - perhaps the user doesn't have permissions.
-				return 0;				
+				return 0;
 			}
 		}
 
@@ -151,27 +134,27 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (bCancelled)
+				if (this.bCancelled)
 				{
 					// inform main thread that this thread stopped
-					m_EventStopped.Set();
+					this.m_EventStopped.Set();
 					return false;
 				}
 
 				// check if thread is cancelled
-				if (m_EventStop.WaitOne(0, true))
+				if (this.m_EventStop.WaitOne(0, true))
 				{
-					bCancelled = true;
+					this.bCancelled = true;
 					// clean up
-					m_mainForm.ClearSamples();
+					this.m_mainForm.ClearSamples();
 
 					// inform main thread that this thread stopped
-					m_EventStopped.Set();
+					this.m_EventStopped.Set();
 					return false;
 				}
 
-				m_mainForm.sampleList[m_mainForm.lnSamples] = s;
-				m_mainForm.sampleColorIndex[m_mainForm.lnSamples] = nColorIndex;
+				this.m_mainForm.sampleList[this.m_mainForm.lnSamples] = s;
+				this.m_mainForm.sampleColorIndex[this.m_mainForm.lnSamples] = nColorIndex;
 				
 				if (!MainForm.configFile.IncludeFilePaths)
 				{
@@ -184,8 +167,8 @@ namespace Aural_Probe
 					if (MainForm.configFile.Categories[i].SearchStrings.Count == 0)
 					{
 						// Special case for "Everything" category
-						m_mainForm.sampleIndices[i,m_mainForm.sampleIndicesCount[i]] = m_mainForm.lnSamples;
-						++m_mainForm.sampleIndicesCount[i];
+						this.m_mainForm.sampleIndices[i, this.m_mainForm.sampleIndicesCount[i]] = this.m_mainForm.lnSamples;
+						++this.m_mainForm.sampleIndicesCount[i];
 					}
 					else
 					{
@@ -195,8 +178,8 @@ namespace Aural_Probe
 							Match match = regex.Match(s);
 							if (match.Success)
 							{
-								m_mainForm.sampleIndices[i, m_mainForm.sampleIndicesCount[i]] = m_mainForm.lnSamples;
-								m_mainForm.sampleIndicesCount[i]++;
+								this.m_mainForm.sampleIndices[i, this.m_mainForm.sampleIndicesCount[i]] = this.m_mainForm.lnSamples;
+								this.m_mainForm.sampleIndicesCount[i]++;
 							}
 						}
 						else
@@ -205,18 +188,18 @@ namespace Aural_Probe
 							{
 								if (s.IndexOf(MainForm.configFile.Categories[i].SearchStrings[j], StringComparison.OrdinalIgnoreCase) != -1)
 								{
-									m_mainForm.sampleIndices[i, m_mainForm.sampleIndicesCount[i]] = m_mainForm.lnSamples;
-									m_mainForm.sampleIndicesCount[i]++;
+									this.m_mainForm.sampleIndices[i, this.m_mainForm.sampleIndicesCount[i]] = this.m_mainForm.lnSamples;
+									this.m_mainForm.sampleIndicesCount[i]++;
 									break;
 								}
 							}
 						}
 					}
 				}
-				m_mainForm.lnSamples++;
+				this.m_mainForm.lnSamples++;
 				return true;
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
 				MessageBox.Show("AddSample " + s + " " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				return false;				
@@ -238,16 +221,16 @@ namespace Aural_Probe
 						{
 							int nSamples = (int)deserializer.Deserialize(myFileStream);
 							MainForm.app.Library.AllocateSampleData(nSamples);
-							if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
-								m_progressBar.Invoke(m_progressBar.m_DelegateUpdateMaximumAndStep, nSamples, nSamples / 20);
+							if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+								this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateMaximumAndStep, nSamples, nSamples / 20);
 							for (int i = 0; i < nSamples; ++i)
 							{
 								string sampleName = (string)deserializer.Deserialize(myFileStream);
 								int sampleColorIndex = (int)deserializer.Deserialize(myFileStream);
-								if (!AddSample(sampleName, sampleColorIndex))
+								if (!this.AddSample(sampleName, sampleColorIndex))
 									return false;
-								if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated && i % m_progressBar.progressBar1.Step == 0)
-									m_progressBar.Invoke(m_progressBar.m_DelegateUpdateForm, null);
+								if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated && i %this.m_progressBar.progressBar1.Step == 0)
+									this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateForm, null);
 							}
 						}
 					}
@@ -264,7 +247,7 @@ namespace Aural_Probe
 					{
 						MessageBox.Show("Could not delete sample cache! " + ex2.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					}
-					m_mainForm.ClearSamples();
+					this.m_mainForm.ClearSamples();
 					return false;
 				}
 			}
@@ -275,16 +258,16 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (IsDirectoryHidden(dir))
+				if (this.IsDirectoryHidden(dir))
 					return true;
 
 				if (!Directory.Exists(dir))
 					return false;
 
-				if (bCancelled)
+				if (this.bCancelled)
 					return false;
 
-				m_mainForm.nColorInc = (m_mainForm.nColorInc + 1) % MainForm.knMaxColors;
+				this.m_mainForm.nColorInc = (this.m_mainForm.nColorInc + 1) % MainForm.knMaxColors;
 				int i = 0;
 				foreach (string formatString in formatStrings)
 				{
@@ -292,7 +275,7 @@ namespace Aural_Probe
 					{
 						foreach (string s in Directory.GetFiles(dir, formatString))
 						{
-							if (!AddSample(s, m_mainForm.nColorInc))
+							if (!this.AddSample(s, this.m_mainForm.nColorInc))
 								return false;
 						}
 					}
@@ -300,9 +283,9 @@ namespace Aural_Probe
 				}
 				foreach (string s in Directory.GetDirectories(dir))
 				{
-					if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
-						m_progressBar.Invoke(m_progressBar.m_DelegateUpdateForm, null);
-					bool bResult = PopulateSamplesFromDirectory(s);
+					if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+						this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateForm, null);
+					bool bResult = this.PopulateSamplesFromDirectory(s);
 					if (!bResult)
 						return false;
 				}
@@ -317,13 +300,13 @@ namespace Aural_Probe
 		// Function runs in worker thread
 		public void Run()
 		{
-			while (!m_progressBar.IsHandleCreated)
+			while (!this.m_progressBar.IsHandleCreated)
 			{
 			}
 
 			try
 			{
-				bCancelled = false;
+				this.bCancelled = false;
 
 				formatFlag[0] = MainForm.configFile.LoadWav;
 				formatFlag[1] = MainForm.configFile.LoadMp3;
@@ -332,13 +315,13 @@ namespace Aural_Probe
 				formatFlag[4] = MainForm.configFile.LoadAiff;
 				formatFlag[5] = MainForm.configFile.LoadFlac;
 
-				m_mainForm.ClearSamples();
-				if (m_bUseCache)
+				this.m_mainForm.ClearSamples();
+				if (this.m_bUseCache)
 				{
-					bool bResult = PopulateSamplesFromCache();
+					bool bResult = this.PopulateSamplesFromCache();
 					if (!bResult)
 					{
-						if (!bCancelled)
+						if (!this.bCancelled)
 						{
 							MessageBox.Show(
 								"Could not load all samples.",
@@ -347,14 +330,14 @@ namespace Aural_Probe
 								MessageBoxIcon.Exclamation);
 						}
 
-						if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
+						if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
 						{
-							m_progressBar.Invoke(m_progressBar.m_DelegateThreadFinished, null);
+							this.m_progressBar.Invoke(this.m_progressBar.m_DelegateThreadFinished, null);
 						}
 
-						if (bCancelled)
+						if (this.bCancelled)
 						{
-							m_mainForm.ClearSamples();
+							this.m_mainForm.ClearSamples();
 						}
 
 						return;
@@ -362,23 +345,23 @@ namespace Aural_Probe
 				}
 				else
 				{
-					nDirectoryCount = 0; // reset
-					nFileCount = 0; // reset
+					this.nDirectoryCount = 0; // reset
+					this.nFileCount = 0; // reset
 					for (int i = 0; i < MainForm.configFile.SearchDirectoriesScrubbed.Count; ++i)
 					{
 						string dir = MainForm.configFile.SearchDirectoriesScrubbed[i];
-						nDirectoryCount += CountDirectoriesInDirectory(dir);
-						nFileCount += CountFilesInDirectory(dir);
+						this.nDirectoryCount += this.CountDirectoriesInDirectory(dir);
+						this.nFileCount += this.CountFilesInDirectory(dir);
 					}
 
-					if (!bCancelled)
+					if (!this.bCancelled)
 					{
-						MainForm.app.Library.AllocateSampleData(nFileCount);
+						MainForm.app.Library.AllocateSampleData(this.nFileCount);
 					}
 
-					if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
+					if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
 					{
-						m_progressBar.Invoke(m_progressBar.m_DelegateUpdateMaximumAndStep, nDirectoryCount, -1);
+						this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateMaximumAndStep, this.nDirectoryCount, -1);
 					}
 
 					for (int i = 0; i < MainForm.configFile.SearchDirectoriesScrubbed.Count; ++i)
@@ -387,29 +370,29 @@ namespace Aural_Probe
 						if (dir.Length == 0)
 							continue;
 
-						bool bResult = PopulateSamplesFromDirectory(dir);
+						bool bResult = this.PopulateSamplesFromDirectory(dir);
 						if (!bResult)
 						{
-							if (!bCancelled)
+							if (!this.bCancelled)
 								MessageBox.Show("Could not load all samples.", "Not all samples loaded!",
 									MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 
-							if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
-								m_progressBar.Invoke(m_progressBar.m_DelegateThreadFinished, null);
+							if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+								this.m_progressBar.Invoke(this.m_progressBar.m_DelegateThreadFinished, null);
 
-							if (bCancelled)
-								m_mainForm.ClearSamples();
+							if (this.bCancelled)
+								this.m_mainForm.ClearSamples();
 							
 							return;
 						}
 					}
 				}
-				if (!m_progressBar.IsDisposed && m_progressBar.IsHandleCreated)
+				if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
 				{
-					m_progressBar.Invoke(m_progressBar.m_DelegateThreadFinished, null);
+					this.m_progressBar.Invoke(this.m_progressBar.m_DelegateThreadFinished, null);
 				}
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
 				MessageBox.Show("Run " + e.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}

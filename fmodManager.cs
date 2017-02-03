@@ -45,8 +45,11 @@ namespace Aural_Probe
 			}
 			catch
 			{
-				MessageBox.Show("Error! Could not find FMOD DLL.", "FMOD DLL missing!",
-					MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show(
+					"Error! Could not find FMOD DLL.",
+					"FMOD DLL missing!",
+					MessageBoxButtons.OK,
+					MessageBoxIcon.Exclamation);
 				Environment.Exit(-1);
 			}
 		}
