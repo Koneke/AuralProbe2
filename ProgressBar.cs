@@ -71,9 +71,13 @@ namespace Aural_Probe
 			{
 				progressBar1.PerformStep();
 				if (m_bUseCache)
-					labelStatus.Text = m_mainForm.lnSamples + " sample(s) loaded from cache";
+				{
+					labelStatus.Text = MainForm.app.Library.Samples.Count + " sample(s) loaded from cache";
+				}
 				else
-					labelStatus.Text = m_mainForm.lnSamples + " sample(s) found";
+				{
+					labelStatus.Text = MainForm.app.Library.Samples.Count + " sample(s) found";
+				}
 			}
 			catch (System.Exception e)
 			{

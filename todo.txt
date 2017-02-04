@@ -8,5 +8,7 @@
 - change the stop button to play when a sample has finished playing (original-bug fix)
 - stop poking the favourites file so much (unfucking)
 - loading favorites is broken since json switch (new-bug fix)
+  - also, we're saving favorites doubly...?
 - write tests (unfucking)
 - overhaul ProgressBar.cs (unfucking)
+- give a bunch of controls real names instead of auto ones (unfucking)

@@ -34,12 +34,6 @@ namespace Aural_Probe
 		private bool bUseCachedSamplesIfPossible;
 
 		private string forceLoadFavoritesName = "";
-		public int lnSamples;
-		public string[] sampleList => app.Library.sampleList;
-		public int[] sampleColorIndex => app.Library.sampleColorIndex;
-		public int[,] sampleIndices => app.Library.sampleIndices;
-		public int[] sampleIndicesCount => app.Library.sampleIndicesCount;
-		private int[] sampleBitField => app.Library.sampleBitField;
 
 		private ToolBarButton toolBarButtonLoadFavorites;
 		private ToolBarButton toolBarButtonSaveFavorites;
@@ -953,7 +947,7 @@ namespace Aural_Probe
 				app.fmodManager.Stop();
 
 				var tempFavorites = new FavoritesFile();
-				if (this.lnSamples > 0 && app.Library.sampleFavoritesCount[0] > 0)
+				if (app.Library.Samples.Count > 0 && app.Library.FavoriteCount > 0)
 				{
 					this.UpdateFavoritesFileFromFavoriteData(tempFavorites, false);
 				}
@@ -967,7 +961,7 @@ namespace Aural_Probe
 					this.PopulateCategoriesWithAudioSamples(false);
 				}
 
-				if (this.lnSamples > 0 && app.Library.sampleFavoritesCount[0] > 0)
+				if (app.Library.Samples.Count > 0 && app.Library.FavoriteCount > 0)
 				{
 					// aren't we overwriting shit here potentially..?
 					this.UpdateFavoriteDataFromFavoritesFile(tempFavorites, false);
@@ -1076,7 +1070,7 @@ namespace Aural_Probe
 						MessageBoxButtons.YesNo,
 						MessageBoxIcon.Question);
 
-					if (app.Library.sampleFavoritesCount[0] > 0 && confirmResetFavorites)
+					if (app.Library.FavoriteCount > 0 && confirmResetFavorites)
 					{
 						app.Files.FavoritesFile.Reset();
 						this.UpdateFavoriteDataFromFavoritesFile(app.Files.FavoritesFile, true);
@@ -1095,7 +1089,7 @@ namespace Aural_Probe
 						MessageBoxButtons.YesNo,
 						MessageBoxIcon.Question);
 
-					if ((app.Library.sampleFavoritesCount[0] == 0 || !this.lbDirtyFavorites) || confirmDiscardFavorites)
+					if ((app.Library.FavoriteCount == 0 || !this.lbDirtyFavorites) || confirmDiscardFavorites)
 					{
 						var fileDialog = new OpenFileDialog {
 							Title = "Open Favorites"
@@ -1391,49 +1385,6 @@ namespace Aural_Probe
 			catch (Exception ex)
 			{
 				MessageBox.Show("listSamples_OnKeyDown " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-		}
-
-		// ?
-		private void SystemEvents_SessionEnding(object sender, SessionEndingEventArgs e) 
-		{
-			try
-			{
-				if (!this.lbDirtyFavorites || app.Library.sampleFavoritesCount[0] == 0)
-				{
-					return;
-				}
-
-				// User is trying to log out. Prompt the user with choices
-				var dr = MessageBox.Show("Do you want to save changes to your favorites before you logout?\n"+
-					"Click Yes to save favorites and log out\n"+
-					"Click No to logout without saving favorites\n"+
-					"Click Cancel to cancel logout and manually close Aural Probe", "Save changes?",
-					MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation);
-
-				// User promises to be good and manually stop the app from now on(yeah right)
-				// Cancel the logout request, app continues
-				if (dr == DialogResult.Cancel)
-				{
-					e.Cancel = true;
-				}
-					// Good user! Santa will bring lots of data this year
-					// Save data and logout
-				else if (dr == DialogResult.Yes)
-				{
-					// if we cancel for some reason, don't abort program, let them save again!
-					e.Cancel = !this.SaveFavorites();
-				}
-				// Bad user! doesn't care about poor data
-				else if (dr == DialogResult.No)
-				{
-					e.Cancel = false;
-					return;
-				}
-			}
-			catch (Exception ex)
-			{
-				MessageBox.Show("SystemEvents_SessionEnding " + ex, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 

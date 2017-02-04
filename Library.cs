@@ -85,18 +85,11 @@ namespace Aural_Probe
 
 	public class Library
 	{
-		private App app;
+		private readonly App app;
 
 		public List<Category> Categories => this.app.Files.ConfigFile.Categories; // lel...
 		public int FavoriteCount => this.Categories?.Sum(category => category.Favorites.Count) ?? 0;
 		public List<Sample> Samples => this.Categories.SelectMany(category => category.Samples).ToList();
-
-		public string[] sampleList;
-		public int[] sampleColorIndex;
-		public int[,] sampleIndices;
-		public int[] sampleIndicesCount;
-		public int[] sampleFavoritesCount; // favourites per category
-		public int[] sampleBitField;
 
 		public Library(App app)
 		{
@@ -115,21 +108,6 @@ namespace Aural_Probe
 				UseRegex= useRegex,
 				Regex = regex
 			};
-		}
-
-		public void AllocateSampleData(int nSize)
-		{
-			try
-			{
-				sampleList = new string[nSize];
-				sampleColorIndex = new int[nSize];
-				sampleBitField = new int[nSize];
-				sampleIndices = new int[ConfigFile.MaxCategories,nSize];
-			}
-			catch (System.Exception ex)
-			{
-				MessageBox.Show("AllocateSampleData " + nSize + " " + ex.ToString(), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);			
-			}
 		}
 
 		public void ClearAll()

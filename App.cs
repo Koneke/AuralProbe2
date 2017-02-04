@@ -25,9 +25,6 @@ namespace Aural_Probe
 		public List<Sample> Selection;
 		public Files Files;
 
-		public int listSamplesSingleSelectedIndex; // when there are multiple selections, this is -1, otherwise it's listSamples.SelectedIndex
-		public int[] listSamplesLastSelectedIndices; // remember the last selected indices to properly handle ListBox item invalidation
-
 		public static int knMaxColors = 16;
 		public int nColorInc;
 		public Color[,] colorList;
@@ -71,9 +68,6 @@ namespace Aural_Probe
 				ColorUtils.HSVtoRGB(ref H, ref S, ref V2, ref R, ref G, ref B);
 				this.colorList[i, 1] = Color.FromArgb((int)(R * 255.0f), (int)(G * 255.0f), (int)(B * 255.0f));
 			}
-
-			this.Library.sampleIndicesCount = new int[ConfigFile.MaxCategories];
-			this.Library.sampleFavoritesCount = new int[ConfigFile.MaxCategories];
 
 			this.mainForm.lbFavoritesOnly = false;
 
@@ -131,57 +125,16 @@ namespace Aural_Probe
 			}
 		}
 
-		public string GetCategoryListName(int i)
-		{
-			try
-			{
-				// Category name, followed by number of favourites in category (if in favourite mode), or number of samples in category, in parenthesis.
-				return this.Files.ConfigFile.Categories[i].Name + " (" +
-					(this.lbFavoritesOnly
-						? this.Library.sampleFavoritesCount[i]
-						: this.Library.sampleIndicesCount[i]) + ")";
-			}
-			catch (Exception e)
-			{
-				MessageBox.Show(
-					"GetCategoryListName " + i + " " + e,
-					"Error!",
-					MessageBoxButtons.OK,
-					MessageBoxIcon.Exclamation);
-				return "";
-			}
-		}
-
-		public bool GetSampleFlag(int sample, int flagBit) =>
-			(this.Library.sampleBitField[sample] & (1 << flagBit)) != 0;
-
-		public void SetSampleFlag(int sample, int flagBit, bool flagValue)
-		{
-			try
-			{
-				if (flagValue)
-				{
-					this.Library.sampleBitField[sample] |= 1 << flagBit;
-				}
-				else
-				{
-					this.Library.sampleBitField[sample] &= ~(1 << flagBit);
-				}
-			}
-			catch (Exception e)
-			{
-				MessageBox.Show("SetSampleFlag " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			}
-		}
-
 		public void ExploreSamples(object sender, EventArgs e)
 		{
 			try
 			{
 				this.fmodManager.Stop();
 
-				var nCurrentCategory = this.mainForm.listCategories.SelectedIndex;
-				if (nCurrentCategory < 0 || this.Library.sampleIndicesCount[nCurrentCategory] == 0) return;
+				if (this.CurrentCategory.Samples.Count == 0)
+				{
+					return;
+				}
 
 				if (this.Selection.Count == 0)
 				{
@@ -222,8 +175,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				var nCurrentCategory = this.mainForm.listCategories.SelectedIndex;
-				if (nCurrentCategory < 0 || this.Library.sampleIndicesCount[nCurrentCategory] == 0)
+				if (this.CurrentCategory.Samples.Count == 0)
 				{
 					return;
 				}
@@ -254,8 +206,7 @@ namespace Aural_Probe
 		{
 			try
 			{
-				var nCurrentCategory = this.mainForm.listCategories.SelectedIndex;
-				if (nCurrentCategory < 0 || this.Library.sampleIndicesCount[nCurrentCategory] == 0)
+				if (this.CurrentCategory.Samples.Count == 0)
 				{
 					return;
 				}
@@ -311,8 +262,11 @@ namespace Aural_Probe
 
 			try
 			{
-				var nCurrentCategory = this.mainForm.listCategories.SelectedIndex;
-				if (nCurrentCategory < 0 || this.Library.sampleIndicesCount[nCurrentCategory] == 0) return;
+				if (this.CurrentCategory.Samples.Count == 0)
+				{
+					return;
+				}
+
 				if (this.mainForm.listSamples.SelectedIndices.Count == 0) return;
 				else if (this.mainForm.listSamples.SelectedIndices.Count == 1)
 				{
@@ -369,23 +323,23 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!this.lbDirtyFavorites || this.Library.sampleFavoritesCount[0] == 0)
+				if (!this.lbDirtyFavorites || this.Library.FavoriteCount == 0)
 				{
 					return;
 				}
 
 				// User is trying to quit. Prompt the user with choices
-				var dr = MessageBox.Show(
+				var saveFavorites = MessageBox.Show(
 					"Do you want to save changes to your favorites?\n",
 					"Save changes?",
 					MessageBoxButtons.YesNo,
 					MessageBoxIcon.Question);
 
-				if (dr == DialogResult.Yes)
+				if (saveFavorites == DialogResult.Yes)
 				{
 					this.mainForm.SaveFavorites(); // if we cancel for some reason, don't abort program, let them save again!
 				}
-				else if (dr == DialogResult.No)
+				else if (saveFavorites == DialogResult.No)
 				{
 					return;
 				}
@@ -400,10 +354,13 @@ namespace Aural_Probe
 		{
 			try
 			{
-				if (!this.lbDirtyFavorites || this.Library.sampleFavoritesCount[0] == 0) return;
+				if (!this.lbDirtyFavorites || this.Library.FavoriteCount == 0)
+				{
+					return;
+				}
 
 				// User is trying to log out. Prompt the user with choices
-				var dr = MessageBox.Show(
+				var saveFavorites = MessageBox.Show(
 					"Do you want to save changes to your favorites before you logout?\n"+
 						"Click Yes to save favorites and log out\n"+
 						"Click No to logout without saving favorites\n"+
@@ -414,19 +371,19 @@ namespace Aural_Probe
 
 				// User promises to be good and manually stop the app from now on(yeah right)
 				// Cancel the logout request, app continues
-				if(dr == DialogResult.Cancel)
+				if(saveFavorites == DialogResult.Cancel)
 				{
 					e.Cancel = true;
 				}
 					// Good user! Santa will bring lots of data this year
 					// Save data and logout
-				else if(dr == DialogResult.Yes)
+				else if(saveFavorites == DialogResult.Yes)
 				{
 					e.Cancel = !this.mainForm.SaveFavorites(); // if we cancel for some reason, don't abort program, let them save again!
 
 				}
 					// Bad user! doesn't care about poor data
-				else if (dr == DialogResult.No)
+				else if (saveFavorites == DialogResult.No)
 				{
 					e.Cancel = false;
 					return;
