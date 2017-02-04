@@ -93,11 +93,18 @@ namespace Aural_Probe
 					searchStrings.Add(legacyConfig.categorySearchStrings[i, j]);
 				}
 
-				config.Categories.Add(new Category {
-					Name = legacyConfig.categoryName[i],
-					SearchStrings = searchStrings,
-					UseRegex = legacyConfig.categoryUseRegularExpressions[i]
-				});
+				var useRegex = legacyConfig.categoryUseRegularExpressions[i];
+
+				config.Categories.Add(MainForm.app.Library.CreateCategory(
+					legacyConfig.categoryName[i],
+					useRegex
+						? null
+						: searchStrings,
+					useRegex,
+					useRegex
+						? searchStrings.First()
+						: null
+				));
 			}
 
 			config.SearchDirectories = legacyConfig.searchDirectories.Where(sd => sd != null).ToList();
@@ -210,9 +217,11 @@ namespace Aural_Probe
 					SampleDisplaySizeH = 32
 				};
 
-				config.Categories.Add(new Category {
-					Name = "All Samples"
-				});
+				config.Categories.Add(MainForm.app.Library.CreateCategory(
+					"All Samples",
+					null,
+					false,
+					null));
 			}
 
 			config.UpdateScrubbedSearchDirectories();

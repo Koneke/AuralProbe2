@@ -4,4 +4,9 @@
   - actual sample class
   - lists and other not-as-dumb things
 - update category list when we hit the favourite button (new-bug fix)
+  - (i.e. show number of favourites in category instead of number of samples)
 - change the stop button to play when a sample has finished playing (original-bug fix)
+- stop poking the favourites file so much (unfucking)
+- loading favorites is broken since json switch (new-bug fix)
+- write tests (unfucking)
+- overhaul ProgressBar.cs (unfucking)

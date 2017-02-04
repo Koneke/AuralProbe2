@@ -812,16 +812,18 @@ namespace Aural_Probe
 			string wildcard,
 			bool useRegex
 		) {
-			return new Category {
-				Name = name,
-				SearchStrings = useRegex
-					? new List<string> { wildcard }
+			return MainForm.app.Library.CreateCategory(
+				 name,
+				useRegex
+					? null
 					: wildcard
 						.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
 						.ToList(),
-				UseRegex = useRegex,
-				Regex = useRegex ? wildcard : null
-			};
+				useRegex,
+				useRegex
+					? wildcard
+					: null
+			);
 		}
 
 		private void EmptyCategoryCreationControls()

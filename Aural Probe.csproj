@@ -137,6 +137,7 @@
     <Compile Include="ProgressBar.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="SampleCache.cs" />
     <Compile Include="SamplesListBox.cs">
       <SubType>Component</SubType>
     </Compile>

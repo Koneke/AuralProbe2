@@ -11,15 +11,16 @@ namespace Aural_Probe
 		private App app;
 		public readonly FMOD.System SystemFmod;
 		private static Sound sound;
-		private readonly Channel channel = null;
-		public readonly bool FmodInitialised;
-		private bool bAutoPlayNextSample;
+		private Channel channel;
+		public bool FmodInitialised;
+		public bool bAutoPlayNextSample;
 		public int nAutoPlayRepeatsLeft = 0;
 		public FMOD.CHANNEL_CALLBACK cbFMOD = null;
 
 		public FmodManager(App app)
 		{
 			this.app = app;
+			this.cbFMOD = app.cbFMOD;
 
 			try
 			{
@@ -76,6 +77,124 @@ namespace Aural_Probe
 			return numDrivers;
 		}
 
+		public bool IsPlaying()
+		{
+			var playing = false;
+			this.channel?.isPlaying(ref playing);
+
+			return playing;
+		}
+
+		// if we're going to play, play the provided sample.
+		public void PlayStop(Sample sample = null)
+		{
+			var bPlaying = this.IsPlaying();
+
+			if (bPlaying)
+			{
+				this.Stop();
+				this.channel?.stop();
+				this.app.fmodManager.bAutoPlayNextSample = false;
+			}
+			else
+			{
+				this.bAutoPlayNextSample = this.app.Files.ConfigFile.Autoplay;
+				this.nAutoPlayRepeatsLeft = this.app.Files.ConfigFile.AutoplayRepeats;
+				this.Play(sample.Path);
+			}
+		}
+
+		public void Stop()
+		{
+			this.channel?.stop();
+			this.bAutoPlayNextSample = false;
+
+			if (sound != null)
+			{
+				var result = sound.release();
+				fmodUtils.ERRCHECK(result);
+				sound = null;
+			}
+		}
+
+		public bool Play(string path, bool lbDontPlayNextSample = false)
+		{
+			FMOD.RESULT result;
+			this.channel?.stop();
+
+			if (sound != null)
+			{
+				result = sound.release();
+				fmodUtils.ERRCHECK(result);
+				sound = null;
+			}
+
+			result = this.app.fmodManager.SystemFmod.createSound(
+				path,
+				FMOD.MODE.SOFTWARE | FMOD.MODE.CREATESTREAM,
+				ref sound);
+			fmodUtils.ERRCHECK(result);
+			var createSoundSucceeded = result == FMOD.RESULT.OK;
+
+			if (createSoundSucceeded)
+			{
+				result = sound.setMode(FMOD.MODE.LOOP_OFF);
+				fmodUtils.ERRCHECK(result);
+
+				if (lbDontPlayNextSample) // ? wat is
+				{
+					lbDontPlayNextSample = false;
+				}
+				else
+				{
+					result = this.SystemFmod.playSound(
+						FMOD.CHANNELINDEX.FREE,
+						sound,
+						false,
+						ref this.channel);
+					fmodUtils.ERRCHECK(result);
+
+					this.channel?.setCallback(this.cbFMOD);
+
+					// wat
+					/*this.toolBarButtonPlayStop.Enabled = this.listSamplesSingleSelectedIndex != -1;
+					this.toolBarButtonPlayStop.Text = "Stop";
+					this.toolBarButtonPlayStop.ImageIndex = 8;
+					this.bAutoPlayNextSample = configFile.Autoplay;*/
+				}
+				FMOD.SOUND_TYPE stype = 0;
+				FMOD.SOUND_FORMAT sformat = 0;
+				var schannels = 0;
+				var sbits = 0;
+				float freq = 0;
+				float vol = 0;
+				float pan = 0;
+				var pri = 0;
+				uint length = 0;
+
+				result = sound.getFormat(ref stype, ref sformat, ref schannels, ref sbits);
+				fmodUtils.ERRCHECK(result);
+
+				result = sound.getDefaults(ref freq, ref vol, ref pan, ref pri);
+				fmodUtils.ERRCHECK(result);
+
+				result = sound.getLength(ref length, FMOD.TIMEUNIT.MS);
+				fmodUtils.ERRCHECK(result);
+
+				/*var lengthstr = (length / (float)1000) + "s";
+				this.statusBarProperties.Text =
+					(freq / 1000) + "KHz " +
+					sbits + "-bit " +
+					(schannels > 1 ? "Stereo " : "Mono ") +
+					"(" + sformat + "), " +
+					lengthstr;*/
+
+				return true;
+			}
+
+			return false;
+		}
+
 		public void TryPrimarySoundDeviceHack()
 		{
 			try
@@ -104,25 +223,22 @@ namespace Aural_Probe
 		{
 			try
 			{
-			if (newDriver == 0)
-			{
-				newDriver = -1;
-			}
-
-			if (newDriver < this.GetNumberOfDrivers())
-			{
-				if (MainForm.sound != null)
+				if (newDriver == 0)
 				{
-					MainForm.sound.release();
+					newDriver = -1;
 				}
 
-				MainForm.sound = null;
+				if (newDriver < this.GetNumberOfDrivers())
+				{
+					sound?.release();
 
-				MainForm.app.fmodManager.SystemFmod.close();
-				MainForm.app.fmodManager.SystemFmod.setDriver(newDriver);
-				var result = MainForm.app.fmodManager.SystemFmod.init(32, INITFLAGS.NORMAL, (IntPtr)null);
-				fmodUtils.ERRCHECK(result);
-			}
+					sound = null;
+
+					this.SystemFmod.close();
+					this.SystemFmod.setDriver(newDriver);
+					var result = this.SystemFmod.init(32, INITFLAGS.NORMAL, (IntPtr)null);
+					fmodUtils.ERRCHECK(result);
+				}
 			}
 			catch (Exception e)
 			{
@@ -227,23 +343,12 @@ namespace Aural_Probe
 			}
 		}
 
-		public void StopSoundPlayback()
+		public void Update()
 		{
-			if (this.channel != null)
+			if (this.SystemFmod != null && this.FmodInitialised && this.channel != null)
 			{
-				var bPlaying = false;
-				this.channel.isPlaying(ref bPlaying);
-				if (bPlaying)
-				{
-					this.channel.stop();
-					this.bAutoPlayNextSample = false;
-				}
-			}
-			if (sound != null)
-			{
-				var result = sound.release();
+				var result = this.SystemFmod.update();
 				fmodUtils.ERRCHECK(result);
-				sound = null;
 			}
 		}
 	}

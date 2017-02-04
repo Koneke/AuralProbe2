@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using System.Threading;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -23,12 +24,12 @@ namespace Aural_Probe
 		private ManualResetEvent m_EventStopped;
 
 		// Reference to progress bar
-		private ProgressBar m_progressBar;
+		private ProgressBar progressBar;
 
-		bool m_bUseCache;
+		bool useCache;
 
 		// Reference to progress bar
-		private MainForm m_mainForm;
+		private MainForm mainForm;
 
 		bool bCancelled;
 
@@ -43,11 +44,11 @@ namespace Aural_Probe
 			MainForm mainForm)
 		{
 			this.bCancelled = false;
-			this.m_bUseCache = bUseCache;
+			this.useCache = bUseCache;
 			this.m_EventStop = eventStop;
 			this.m_EventStopped = eventStopped;
-			this.m_mainForm = mainForm;
-			this.m_progressBar = progressBar;
+			this.mainForm = mainForm;
+			this.progressBar = progressBar;
 		}
 
 		public bool IsDirectoryHidden(string dir)
@@ -80,16 +81,18 @@ namespace Aural_Probe
 				}
 
 				this.nDirectoryCount++;
-				if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+				if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 				{
-					this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateLabel, this.nDirectoryCount + " folder(s) found");
+					this.progressBar.Invoke(this.progressBar.m_DelegateUpdateLabel, this.nDirectoryCount + " folder(s) found");
 				}
 
 				var nSubDirectories = 1;
 				foreach (var s in Directory.GetDirectories(dir))
 				{
 					if (!this.bCancelled)
+					{
 						nSubDirectories += this.CountDirectoriesInDirectory(s);
+					}
 				}
 
 				return nSubDirectories;
@@ -132,9 +135,9 @@ namespace Aural_Probe
 				}
 
 				this.nFileCount += nFiles;
-				if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+				if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 				{
-					this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateLabel, this.nFileCount + " file(s) found");
+					this.progressBar.Invoke(this.progressBar.m_DelegateUpdateLabel, this.nFileCount + " file(s) found");
 				}
 				
 				return nFiles;
@@ -146,7 +149,7 @@ namespace Aural_Probe
 			}
 		}
 
-		public bool AddSample(string s, int nColorIndex)
+		public bool AddSample(string path, int nColorIndex)
 		{
 			try
 			{
@@ -162,50 +165,48 @@ namespace Aural_Probe
 				{
 					this.bCancelled = true;
 					// clean up
-					this.m_mainForm.ClearSamples();
+					this.mainForm.ClearSamples();
 
 					// inform main thread that this thread stopped
 					this.m_EventStopped.Set();
 					return false;
 				}
 
-				this.m_mainForm.sampleList[this.m_mainForm.lnSamples] = s;
-				this.m_mainForm.sampleColorIndex[this.m_mainForm.lnSamples] = nColorIndex;
+				var sample = new Sample(path)
+				{
+					ColorIndex = nColorIndex
+				};
 				
 				if (!MainForm.configFile.IncludeFilePaths)
 				{
-					var sSplit = s.Split('\\');
-					s = sSplit[sSplit.Length - 1];
+					var sSplit = path.Split('\\');
+					path = sSplit[sSplit.Length - 1];
 				}
 
-				for (var i = 0; i < MainForm.configFile.Categories.Count; ++i)
+				foreach (var category in MainForm.configFile.Categories)
 				{
-					if (MainForm.configFile.Categories[i].SearchStrings.Count == 0)
+					// if this is the "All samples" category
+					if (category == MainForm.configFile.Categories.First())
 					{
-						// Special case for "Everything" category
-						this.m_mainForm.sampleIndices[i, this.m_mainForm.sampleIndicesCount[i]] = this.m_mainForm.lnSamples;
-						++this.m_mainForm.sampleIndicesCount[i];
+						category.Samples.Add(sample);
 					}
 					else
 					{
-						if (MainForm.configFile.Categories[i].UseRegex)
+						if (category.UseRegex)
 						{
-							var regex = new Regex(MainForm.configFile.Categories[i].SearchStrings[0], RegexOptions.IgnoreCase);
-							var match = regex.Match(s);
-							if (match.Success)
+							var regex = new Regex(category.SearchStrings[0], RegexOptions.IgnoreCase);
+							if (regex.Match(path).Success)
 							{
-								this.m_mainForm.sampleIndices[i, this.m_mainForm.sampleIndicesCount[i]] = this.m_mainForm.lnSamples;
-								this.m_mainForm.sampleIndicesCount[i]++;
+								category.Samples.Add(sample);
 							}
 						}
 						else
 						{
-							foreach (var searchString in MainForm.configFile.Categories[i].SearchStrings)
+							foreach (var searchString in category.SearchStrings)
 							{
-								if (s.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) != -1)
+								if (path.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) != -1)
 								{
-									this.m_mainForm.sampleIndices[i, this.m_mainForm.sampleIndicesCount[i]] = this.m_mainForm.lnSamples;
-									this.m_mainForm.sampleIndicesCount[i]++;
+									category.Samples.Add(sample);
 									break;
 								}
 							}
@@ -213,12 +214,11 @@ namespace Aural_Probe
 					}
 				}
 
-				this.m_mainForm.lnSamples++;
 				return true;
 			}
 			catch (Exception e)
 			{
-				MessageBox.Show("AddSample " + s + " " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				MessageBox.Show("AddSample " + path + " " + e, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				return false;
 			}
 		}
@@ -229,36 +229,30 @@ namespace Aural_Probe
 			{
 				try
 				{
-					using (Stream myFileStream = File.OpenRead(MainForm.GetSampleCacheFilepath()))
+					var sampleCache = SampleCache.Load(MainForm.GetSampleCacheFilepath());
+					var cacheSize = sampleCache.CacheSize;
+
+					if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 					{
-						var deserializer = new BinaryFormatter();
-					
-						var nCacheVersion = (int)deserializer.Deserialize(myFileStream);
-						if (nCacheVersion == 1)
+						this.progressBar.Invoke(
+							this.progressBar.m_DelegateUpdateMaximumAndStep,
+							cacheSize,
+							cacheSize / 20);
+					}
+
+					var i = 0;
+					foreach (var cachedSample in sampleCache.Cache)
+					{
+						if (!this.AddSample(cachedSample.Path, cachedSample.ColorIndex))
 						{
-							var nSamples = (int)deserializer.Deserialize(myFileStream);
-							MainForm.app.Library.AllocateSampleData(nSamples);
+							return false;
+						}
 
-							if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
-							{
-								this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateMaximumAndStep, nSamples, nSamples / 20);
-							}
-
-							for (var i = 0; i < nSamples; ++i)
-							{
-								var sampleName = (string)deserializer.Deserialize(myFileStream);
-								var sampleColorIndex = (int)deserializer.Deserialize(myFileStream);
-
-								if (!this.AddSample(sampleName, sampleColorIndex))
-								{
-									return false;
-								}
-
-								if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated && i %this.m_progressBar.progressBar1.Step == 0)
-								{
-									this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateForm, null);
-								}
-							}
+						if (!this.progressBar.IsDisposed &&
+							this.progressBar.IsHandleCreated &&
+							i++ % this.progressBar.progressBar1.Step == 0)
+						{
+							this.progressBar.Invoke(this.progressBar.m_DelegateUpdateForm, null);
 						}
 					}
 
@@ -285,7 +279,7 @@ namespace Aural_Probe
 							MessageBoxIcon.Exclamation);
 					}
 
-					this.m_mainForm.ClearSamples();
+					this.mainForm.ClearSamples();
 					return false;
 				}
 			}
@@ -311,7 +305,7 @@ namespace Aural_Probe
 					return false;
 				}
 
-				this.m_mainForm.nColorInc = (this.m_mainForm.nColorInc + 1) % MainForm.knMaxColors;
+				this.mainForm.nColorInc = (this.mainForm.nColorInc + 1) % MainForm.knMaxColors;
 				var i = 0;
 
 				foreach (var formatString in FormatStrings)
@@ -320,7 +314,7 @@ namespace Aural_Probe
 					{
 						foreach (var s in Directory.GetFiles(dir, formatString))
 						{
-							if (!this.AddSample(s, this.m_mainForm.nColorInc))
+							if (!this.AddSample(s, this.mainForm.nColorInc))
 							{
 								return false;
 							}
@@ -331,9 +325,9 @@ namespace Aural_Probe
 
 				foreach (var s in Directory.GetDirectories(dir))
 				{
-					if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+					if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 					{
-						this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateForm, null);
+						this.progressBar.Invoke(this.progressBar.m_DelegateUpdateForm, null);
 					}
 
 					var bResult = this.PopulateSamplesFromDirectory(s);
@@ -354,7 +348,7 @@ namespace Aural_Probe
 		// Function runs in worker thread
 		public void Run()
 		{
-			while (!this.m_progressBar.IsHandleCreated)
+			while (!this.progressBar.IsHandleCreated)
 			{
 			}
 
@@ -369,11 +363,12 @@ namespace Aural_Probe
 				FormatFlag[4] = MainForm.configFile.LoadAiff;
 				FormatFlag[5] = MainForm.configFile.LoadFlac;
 
-				this.m_mainForm.ClearSamples();
-				if (this.m_bUseCache)
+				this.mainForm.ClearSamples();
+				if (this.useCache)
 				{
-					var bResult = this.PopulateSamplesFromCache();
-					if (!bResult)
+					var result = this.PopulateSamplesFromCache();
+
+					if (!result)
 					{
 						if (!this.bCancelled)
 						{
@@ -384,14 +379,14 @@ namespace Aural_Probe
 								MessageBoxIcon.Exclamation);
 						}
 
-						if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+						if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 						{
-							this.m_progressBar.Invoke(this.m_progressBar.m_DelegateThreadFinished, null);
+							this.progressBar.Invoke(this.progressBar.m_DelegateThreadFinished, null);
 						}
 
 						if (this.bCancelled)
 						{
-							this.m_mainForm.ClearSamples();
+							this.mainForm.ClearSamples();
 						}
 
 						return;
@@ -408,14 +403,9 @@ namespace Aural_Probe
 						this.nFileCount += this.CountFilesInDirectory(dir);
 					}
 
-					if (!this.bCancelled)
+					if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 					{
-						MainForm.app.Library.AllocateSampleData(this.nFileCount);
-					}
-
-					if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
-					{
-						this.m_progressBar.Invoke(this.m_progressBar.m_DelegateUpdateMaximumAndStep, this.nDirectoryCount, -1);
+						this.progressBar.Invoke(this.progressBar.m_DelegateUpdateMaximumAndStep, this.nDirectoryCount, -1);
 					}
 
 					foreach (var dir in MainForm.configFile.SearchDirectoriesScrubbed)
@@ -437,23 +427,23 @@ namespace Aural_Probe
 									MessageBoxIcon.Exclamation);
 							}
 
-							if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+							if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 							{
-								this.m_progressBar.Invoke(this.m_progressBar.m_DelegateThreadFinished, null);
+								this.progressBar.Invoke(this.progressBar.m_DelegateThreadFinished, null);
 							}
 
 							if (this.bCancelled)
 							{
-								this.m_mainForm.ClearSamples();
+								this.mainForm.ClearSamples();
 							}
 							
 							return;
 						}
 					}
 				}
-				if (!this.m_progressBar.IsDisposed && this.m_progressBar.IsHandleCreated)
+				if (!this.progressBar.IsDisposed && this.progressBar.IsHandleCreated)
 				{
-					this.m_progressBar.Invoke(this.m_progressBar.m_DelegateThreadFinished, null);
+					this.progressBar.Invoke(this.progressBar.m_DelegateThreadFinished, null);
 				}
 			}
 			catch (Exception e)
