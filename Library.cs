@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Windows.Forms;
 using Newtonsoft.Json;
 
 namespace Aural_Probe
@@ -35,23 +34,13 @@ namespace Aural_Probe
 	// just have a category name or whatever on sample
 	public class Category
 	{
-		[JsonIgnore] private App app;
+		[JsonIgnore] protected readonly App App;
 
 		// we need an underlying field, or automatic update of the name
 		// in the category listbox won't work
 		// (doesn't handle nested properties)
 		[JsonIgnore] private string name;
-		public string Name
-		{
-			get
-			{
-				return this.name;
-			}
-			set
-			{
-				this.name = value;
-			}
-		}
+		public string Name { get { return this.name; } set { this.name = value; } }
 
 		[JsonIgnore] public Category Cat => this;
 
@@ -62,7 +51,7 @@ namespace Aural_Probe
 				var listName = this.name;
 
 				listName += " (" +
-					(this.app.lbFavoritesOnly ? this.Favorites : this.Samples).Count
+					(this.App.lbFavoritesOnly ? this.Favorites : this.Samples).Count
 					+ ")";
 
 				return listName;
@@ -78,8 +67,25 @@ namespace Aural_Probe
 
 		public Category(App app)
 		{
-			this.app = app;
+			this.App = app;
 			this.Samples = new List<Sample>();
+		}
+
+		public void AddSample(Sample sample)
+		{
+			this.Samples.Add(sample);
+			sample.Category = this;
+		}
+	}
+
+	public class AllSamplesCategory : Category
+	{
+		public new List<Sample> Samples => this.App.Library.Categories
+			.SelectMany(category => category.Samples)
+			.ToList();
+
+		public AllSamplesCategory(App app) : base(app)
+		{
 		}
 	}
 
@@ -90,10 +96,12 @@ namespace Aural_Probe
 		public List<Category> Categories => this.app.Files.ConfigFile.Categories; // lel...
 		public int FavoriteCount => this.Categories?.Sum(category => category.Favorites.Count) ?? 0;
 		public List<Sample> Samples => this.Categories.SelectMany(category => category.Samples).ToList();
+		public List<Sample> _Samples;
 
 		public Library(App app)
 		{
 			this.app = app;
+			this._Samples = new List<Sample>();
 		}
 
 		public Category CreateCategory(
@@ -123,6 +131,17 @@ namespace Aural_Probe
 			{
 				category.Samples.Clear();
 			}
+		}
+
+		public void AddSample(Category category, Sample sample)
+		{
+			this._Samples.Add(sample);
+
+			// Category.AddSample sets category,
+			// but we're going to phase that out.
+			// so just so I don't forget down the line.
+			category.AddSample(sample);
+			sample.Category = category;
 		}
 	}
 }

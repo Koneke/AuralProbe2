@@ -169,11 +169,13 @@ namespace Aural_Probe
 
 		private static string GetOldFormatConfigFilePath()
 		{
+			var adp = MainForm.GetApplicationDataPath();
 			return MainForm.GetApplicationDataPath() + "\\" + OldFormatConfigFilePath;
 		}
 
 		private static string GetConfigFilePath()
 		{
+			var adp = MainForm.GetApplicationDataPath();
 			return MainForm.GetApplicationDataPath() + "\\" + ConfigFilePath;
 		}
 
@@ -184,7 +186,7 @@ namespace Aural_Probe
 			return configFile;
 		}
 
-		public static ConfigFile Load()
+		public static ConfigFile Load(App app)
 		{
 			ConfigFile config;
 
@@ -217,7 +219,7 @@ namespace Aural_Probe
 					SampleDisplaySizeH = 32
 				};
 
-				config.Categories.Add(MainForm.app.Library.CreateCategory(
+				config.Categories.Add(app.Library.CreateCategory(
 					"All Samples",
 					null,
 					false,

@@ -1113,20 +1113,24 @@ namespace Aural_Probe
 						}
 					}
 				}
-				else if (e.Button == this.toolBarButtonSaveFavorites )
+				else if (e.Button == this.toolBarButtonSaveFavorites)
 				{
 					app.fmodManager.Stop();
 
 					if (app.Library.FavoriteCount == 0)
 					{
-						MessageBox.Show("There are no favorites to save.", "Save Favorites", MessageBoxButtons.OK, MessageBoxIcon.Information);
+						MessageBox.Show(
+							"There are no favorites to save.",
+							"Save Favorites",
+							MessageBoxButtons.OK,
+							MessageBoxIcon.Information);
 					}
 					else
 					{
 						this.SaveFavorites();
 					}
 				}
-				else if (e.Button == this.toolBarButtonConfiguration )
+				else if (e.Button == this.toolBarButtonConfiguration)
 				{
 					app.fmodManager.Stop();
 
@@ -1154,11 +1158,14 @@ namespace Aural_Probe
 					}
 					catch
 					{
-						MessageBox.Show("Error!  Could not find help.", "Error!", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+						MessageBox.Show(
+							"Error! Could not find help.",
+							"Error!",
+							MessageBoxButtons.OK,
+							MessageBoxIcon.Exclamation);
 					}
-				
 				}
-				else if ( e.Button == this.toolBarButtonAbout )
+				else if (e.Button == this.toolBarButtonAbout)
 				{
 					app.fmodManager.Stop();
 

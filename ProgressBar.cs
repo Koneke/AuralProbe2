@@ -106,7 +106,12 @@ namespace Aural_Probe
 		{
 			try
 			{
-				ScanFoldersProcess process = new ScanFoldersProcess(m_EventStopThread, m_EventThreadStopped, m_bUseCache, this, m_mainForm);
+				var process = new ScanFoldersProcess(
+					m_EventStopThread,
+					m_EventThreadStopped,
+					m_bUseCache,
+					this,
+					m_mainForm);
 				process.Run();
 			}
 			catch (System.Exception e)

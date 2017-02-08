@@ -39,7 +39,7 @@ namespace Aural_Probe
 		private void Init()
 		{
 			this.Files.WorkingDirectory = Directory.GetCurrentDirectory();
-			this.Files.ConfigFile = ConfigFile.Load();
+			this.Files.ConfigFile = ConfigFile.Load(this);
 
 			var a = JsonConvert.SerializeObject(this.Files.ConfigFile, Formatting.Indented);
 
